@@ -47,3 +47,11 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Class rosters (contain student IDs and emails; never commit)
+*.xlsx
+*.xls
+*.csv
+
+# Office lock files
+~$*
