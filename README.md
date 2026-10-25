@@ -2,8 +2,8 @@
 
 Student Tidyverse Vignettes — DATA 607, Fall 2026
 
-- **Assignment 1 due:** ____
-- **Assignment 2 due:** ____
+- **TIDYVERSE CREATE (Assignment 1) due: 15-Nov-2026**
+- **TIDYVERSE ExTEND (Assignment 2) due:06-Dec-2026**
 
 ## The two assignments
 
