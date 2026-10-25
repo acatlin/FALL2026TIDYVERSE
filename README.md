@@ -7,8 +7,8 @@ Student Tidyverse Vignettes — DATA 607, Fall 2026
 
 ## The two assignments
 
-1. **Initial vignette.** Write a `.qmd` file that demonstrates one or more R / tidyverse functions with a worked example. Add it to this repo with a pull request, and fill in the **Initial** line of your own block in the roster below.
-2. **Revision / addition.** Pick a *different* classmate's vignette that has already been merged, and improve it: add a second example, an enhancement, or a correction. Submit it as a pull request, and fill in the **Revision/Addition** line of your own block.
+1. **Initial vignette (TIDYVERSE CREATE).** Write a `.qmd` file that demonstrates one or more R / tidyverse functions with a worked example. Add it to this repo with a pull request, and fill in the **Initial** line of your own block in the roster below.
+2. **Revision / addition (TIDYVERSE EXTEND).** Pick a *different* classmate's vignette that has already been merged, and improve it: add a second example, an enhancement, or a correction. Submit it as a pull request, and fill in the **Revision/Addition** line of your own block.
 
 You are not a collaborator on this repo, so every change arrives as a pull request from your fork. The instructor merges pull requests; you do not merge your own.
 
@@ -16,7 +16,6 @@ You are not a collaborator on this repo, so every change arrives as a pull reque
 
 - **Edit only your own block in this README.** Replace the `_TBD_` after the colon on your two lines. Do not add, delete, or reorder any other lines.
 - **Sync your fork with this repo right before opening each pull request** (GitHub: *Sync fork* button on your fork, then `git pull` locally). Stale forks cause merge conflicts in this README.
-- **One branch per assignment** in your fork, for example `initial-andre-t` and `revision-andre-t`. Do not work on your fork's `main`.
 - **Vignettes live in `vignettes/`** and are named `firstname_lastinitial_topic.qmd`, for example `vignettes/andre_t_pivot_longer.qmd`. Lowercase, underscores, no spaces.
 - **Commit only the `.qmd` file.** Do not commit rendered `.html` or `.pdf` (they are gitignored) and do not commit data files. Use a built-in R dataset or read a public URL inside the document.
 - **Assignment 2 edits the classmate's existing file in place.** Do not create a new file or rename theirs. Choose a vignette that nobody has revised yet; check the roster before you start.
@@ -26,13 +25,13 @@ You are not a collaborator on this repo, so every change arrives as a pull reque
 
 1. **Fork** this repo on GitHub (once; reuse the same fork for both assignments).
 2. **Clone** your fork: `git clone https://github.com/<your-username>/FALL2026TIDYVERSE.git`
-3. **Sync** your fork with upstream (see above), then create a branch: `git checkout -b initial-andre-t`
+3. **Sync** your fork with upstream (see above) and `git pull` so your local copy matches.
 4. **Add or edit** the vignette, and update your block in `README.md`.
-5. **Commit** and **push** the branch: `git push -u origin initial-andre-t`
-6. **Open a pull request** from your branch to `acatlin/FALL2026TIDYVERSE` `main`. Title it:
+5. **Commit** and **push** to your fork: `git push`
+6. **Open a pull request** from your fork to `acatlin/FALL2026TIDYVERSE` `main`. Title it:
    - Assignment 1: `Initial: Andre T`
    - Assignment 2: `Revision: Andre T edits Benjamin B`
-7. **Assignment 2 only:** once the pull request exists, copy its URL into your Revision/Addition line, commit, and push to the same branch. The open pull request picks up the new commit automatically.
+7. **Assignment 2 only:** once the pull request exists, copy its URL into your Revision/Addition line, commit, and push again. The open pull request picks up the new commit automatically.
 
 ## What a finished block looks like
 
@@ -48,6 +47,11 @@ Revision/Addition Description and Link: Added a `separate_wider_delim()` example
 ## Roster
 
 ### Anastasiia G
+Initial Description and Link: _TBD_
+
+Revision/Addition Description and Link: _TBD_
+
+### Andy C
 Initial Description and Link: _TBD_
 
 Revision/Addition Description and Link: _TBD_
