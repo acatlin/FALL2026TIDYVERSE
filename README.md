@@ -77,7 +77,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Chanice M
-Initial Description and Link: _TBD_
+Initial Description and Link: Exploring diamond prices using dplyr and ggplot2, including grouping, summarization, and visualization by cut and carat size — [chanice_m_diamond_prices.qmd](vignettes/chanice_m_diamond_prices.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
