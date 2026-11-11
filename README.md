@@ -47,7 +47,7 @@ Revision/Addition Description and Link: Added a `separate_wider_delim()` example
 ## Roster
 
 ### Anastasiia G
-Initial Description and Link: _TBD_
+Initial Description and Link: Demonstrates dplyr, tidyr, and ggplot2 using international tourism data — [anastasiia_g_tourism.qmd](vignettes/anastasiia_g_tourism.qmd)
 
 Revision/Addition Description and Link: _TBD_
 

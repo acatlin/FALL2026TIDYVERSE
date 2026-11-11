@@ -1,0 +1,185 @@
+---
+title: "TidyVerse CREATE assignment"
+author: "Anastasiia Gmyrina"
+---
+
+## Introduction
+
+International tourism has changed significantly in recent years, especially following the COVID-19 pandemic. Some destinations have recovered faster than others, while travel patterns continue to evolve. In this vignette, I will use three Tidyverse packages—dplyr, tidyr, and ggplot2—to explore international tourism trends.
+
+## Data Source
+
+The data comes from Our World in Data, using international tourist arrival statistics from UN Tourism.
+
+Source: <https://ourworldindata.org/grapher/international-tourist-trips>
+
+### Data loading
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+
+tourism <- read_csv(
+  "https://ourworldindata.org/grapher/international-tourist-trips.csv"
+)
+
+glimpse(tourism)
+```
+
+### Filtering and Renaming with `dplyr`
+
+The `dplyr` package helps us manipulate datasets using readable functions.
+
+In this example, we will use:
+
+- **`filter()`** to select specific countries and years.
+
+- **`rename()`** to simplify column names.
+
+- **`head()`** to display first 6 rows.
+
+We will focus on ten countries between 2019 and 2024 to compare international tourism trends before, during, and after the pandemic.
+
+```{r}
+# Filter the dataset to include selected countries and years
+tourism_selected <- tourism %>%
+  filter(
+    Entity %in% c(
+      "Spain", "United States", "Italy", "Mexico",
+      "United Kingdom", "Germany", "Portugal",
+      "Canada", "Singapore", "Brazil"
+    ),
+    between(Year, 2019, 2024)
+  ) %>%
+  
+  # Rename columns for easier reference
+  rename(
+    Country = Entity,
+    Arrivals = `Arrivals of tourists from abroad`
+  )
+
+#  Display the first 6 rows of the filtered dataset
+head(tourism_selected)
+```
+
+### Summarizing Tourism Data with `dplyr`
+
+The `group_by()` function organizes the data into groups, while `summarise()` calculates a summary value for each group. In this example, we will calculate total tourist arrivals for each country in 2019 and 2024.
+
+We will also use `arrange()` with `desc()` to sort the results from the highest to the lowest number of arrivals.
+
+```{r}
+# Calculate tourist arrivals by country and year
+tourism_summary <- tourism_selected %>%
+  filter(Year %in% c(2019, 2024)) %>%
+  group_by(Country, Year) %>%
+  summarise(
+    Total_Arrivals = sum(Arrivals, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Total_Arrivals))
+# Display the results
+head(tourism_summary)
+```
+
+### Reshaping Data with `pivot_wider()`
+
+One useful function is `pivot_wider()`, which converts values from rows into separate columns.
+
+Currently, each country has a separate row for 2019 and 2024. We will use `pivot_wider()` to create one row per country, with tourist arrivals for each year displayed side by side.
+
+We will then use `mutate()` from `dplyr` to calculate the percentage change in tourist arrivals between 2019 and 2024.
+
+```{r}
+# Reshape the data from long to wide format
+tourism_wide <- tourism_summary %>%
+  
+  # Create separate columns for 2019 and 2024
+  pivot_wider(
+    names_from = Year,
+    values_from = Total_Arrivals,
+    names_prefix = "Year_"
+  ) %>%
+  
+  # Calculate the percentage change from 2019 to 2024
+  mutate(
+    Percent_Change = round(
+      (Year_2024 - Year_2019) / Year_2019 * 100, 1
+    )
+  ) %>%
+  
+  # Sort countries by percentage change
+  arrange(desc(Percent_Change))
+
+# Display the results
+tourism_wide
+```
+
+## Visualizing Tourism Recovery with ggplot2
+
+The `ggplot2` package allows us to create visualizations using layers. We start with `ggplot()` to define our dataset and variables, then add geometric elements such as bars, points, or lines.
+
+In this example, we will create a bar chart to compare the percentage change in international tourist arrivals between 2019 and 2024.
+
+We will use:
+
+- `ggplot()` to initialize the chart.
+
+- `aes()` to map variables to the axes.
+
+- `geom_col()` to create bars using our calculated values.
+
+- `coord_flip()` to make the bars horizontal.
+
+- `labs()` to add a title and axis labels.
+
+- `theme_minimal()` to apply a clean visual style.
+
+```{r}
+ggplot(
+  tourism_wide,
+  aes(x = reorder(Country, Percent_Change),
+      y = Percent_Change)
+) +
+  # Create horizontal bars
+  geom_col(fill = "steelblue") +
+  
+  # Add percentage labels outside the bars
+  geom_text(
+    aes(
+      label = paste0(Percent_Change, "%"),
+      hjust = ifelse(Percent_Change >= 0, -0.2, 1.2)
+    ),
+    size = 3.5
+  ) +
+  
+  # Make bars horizontal
+  coord_flip() +
+  
+  # Add extra space for data labels
+  scale_y_continuous(limits = c(-25, 85)) +
+  
+  # Add titles and labels
+  labs(
+    title = "Change in International Tourist Arrivals (2019–2024)",
+    x = "Country",
+    y = "Percentage Change (%)"
+  ) +
+  
+  theme_minimal()
+```
+
+The chart shows how international tourist arrivals changed between 2019 and 2024 across ten selected countries. Portugal had the largest increase at 67.6%, followed by Spain at 12.3%. Mexico remained almost unchanged, while several countries had not yet returned to their 2019 levels. Singapore experienced the largest decrease at 13.9%.
+
+This example demonstrates how `ggplot2` can turn a summary table into a visualization that makes comparisons easier. By combining `geom_col()`, `geom_text()`, and `coord_flip()`, we created a horizontal bar chart with percentage labels that clearly highlights differences between countries.
+
+### Conclusion
+
+In this vignette, I demonstrated how three Tidyverse packages can be used together to explore international tourism data. I used `dplyr` to filter and summarize the data, `tidyr` to reshape it, and `ggplot2` to visualize the results.
+
+The analysis showed that tourism recovery varied across the ten selected countries. Portugal had the largest increase in international tourist arrivals between 2019 and 2024, while Singapore experienced the largest decrease.
+
+## References
+
+- Our World in Data. *International Tourist Trips*. <https://ourworldindata.org/grapher/international-tourist-trips>
