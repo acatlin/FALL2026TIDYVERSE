@@ -167,10 +167,9 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Kevin V
-Initial Description and Link: _TBD_
+Initial Description and Link: `fct_lump_n()`, `fct_collapse()`, and other forcats functions on the NYC Dog Licensing dataset — [kevin_v_forcats_nyc_dogs.qmd](vignettes/kevin_v_forcats_nyc_dogs.qmd)
 
 Revision/Addition Description and Link: _TBD_
-
 ### Lakeranie B
 Initial Description and Link: _TBD_
 
