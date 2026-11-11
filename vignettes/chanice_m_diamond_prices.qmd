@@ -1,0 +1,150 @@
+---
+title: "Exploring Diamond Prices with dplyr and ggplot2"
+author: "Chanice Mckenzie"
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  warning: false
+  message: false
+---
+
+# Introduction
+
+This vignette demonstrates how to use **dplyr** and **ggplot2** to summarize and visualize diamond prices. The example uses the `diamonds` dataset that comes with ggplot2, so no local files or external API requests are needed. Our question is: **How does the relationship between diamond cut and price change when we also consider carat size?**
+
+# 1. Load packages and inspect the data
+
+We load the packages used in this example. The `diamonds` dataset has one row per diamond, with information such as carat weight, cut quality, and price in US dollars.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+
+diamonds_data <- ggplot2::diamonds
+
+glimpse(diamonds_data)
+```
+
+# 2. Create useful categories with `mutate()` and `case_when()`
+
+`mutate()` adds or changes columns without removing the original observations. `case_when()` assigns each diamond to a carat-size category. We use four non-overlapping ranges so diamonds are categorized consistently.
+
+```{r}
+diamonds_clean <- diamonds_data |>
+  mutate(
+    carat_group = case_when(
+      carat < 0.50 ~ "Under 0.50 ct",
+      carat < 1.00 ~ "0.50–0.99 ct",
+      carat < 1.50 ~ "1.00–1.49 ct",
+      TRUE ~ "1.50 ct or more"
+    ),
+    carat_group = factor(
+      carat_group,
+      levels = c("Under 0.50 ct", "0.50–0.99 ct",
+                 "1.00–1.49 ct", "1.50 ct or more")
+    )
+  )
+
+# Check that every diamond belongs to a size group.
+diamonds_clean |>
+  count(carat_group) |>
+  kable(caption = "Number of diamonds in each size group")
+```
+
+# 3. Summarize price by cut with `group_by()` and `summarise()`
+
+`group_by()` tells dplyr which observations to analyze together. `summarise()` reduces each group to summary statistics. We calculate both mean and median prices because unusually expensive diamonds may affect the mean. `arrange()` sorts the results from highest to lowest median price.
+
+```{r}
+cut_summary <- diamonds_clean |>
+  group_by(cut) |>
+  summarise(
+    diamonds = n(),
+    mean_price = mean(price),
+    median_price = median(price),
+    .groups = "drop"
+  ) |>
+  arrange(desc(median_price))
+
+cut_summary |>
+  kable(digits = 0, caption = "Diamond prices summarized by cut")
+```
+
+**Interpretation:** This table shows the *unadjusted* relationship between cut and price. Comparing cuts without accounting for diamond size can be misleading because a larger diamond typically costs more than a smaller one.
+
+# 4. Compare cut within carat-size groups
+
+We now group by **both** carat size and cut. This produces a more meaningful descriptive comparison than a single overall average, although other attributes (including color and clarity) can still differ within groups.
+
+```{r}
+size_cut_summary <- diamonds_clean |>
+  group_by(carat_group, cut) |>
+  summarise(
+    diamonds = n(),
+    median_price = median(price),
+    .groups = "drop"
+  ) |>
+  arrange(carat_group, desc(median_price))
+
+size_cut_summary |>
+  kable(digits = 0, caption = "Median diamond price by cut and carat-size group")
+```
+
+# 5. Visualize comparisons with `ggplot2`
+
+A boxplot shows the overall distribution of prices for each cut, including the median and variation. We hide individual outlier markers to keep the figure readable, but the underlying observations remain in the analysis.
+
+```{r}
+ggplot(diamonds_clean, aes(x = cut, y = price)) +
+  geom_boxplot(outlier.shape = NA, fill = "#83B6C9") +
+  coord_cartesian(ylim = c(0, 12000)) +
+  labs(
+    title = "Diamond price distributions vary by cut",
+    subtitle = "The overall comparison does not control for carat weight",
+    x = "Cut quality",
+    y = "Price (US dollars)",
+    caption = "Source: ggplot2 diamonds dataset. Display clipped at $12,000; analysis uses all prices."
+  ) +
+  theme_minimal()
+```
+
+We can also use `facet_wrap()` to create a separate panel for each carat-size group. This helps us compare diamonds of more similar sizes while using a consistent y-axis across panels.
+
+```{r}
+ggplot(size_cut_summary, aes(x = cut, y = median_price)) +
+  geom_col(fill = "#397F96", width = 0.7) +
+  facet_wrap(~ carat_group, ncol = 2) +
+  scale_y_continuous(labels = scales::label_dollar()) +
+  labs(
+    title = "Comparing cuts within carat-size groups",
+    subtitle = "Median price is calculated separately for each cut and size group",
+    x = "Cut quality",
+    y = "Median price (US dollars)",
+    caption = "Source: ggplot2 diamonds dataset. Shared y-axis across panels."
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+```
+
+# 6. Validate our summaries
+
+A good analysis should include simple checks. The number of records in the cut summary should equal the number of rows in the original dataset, and every diamond should have a valid carat-size category.
+
+```{r}
+stopifnot(sum(cut_summary$diamonds) == nrow(diamonds_data))
+stopifnot(!anyNA(diamonds_clean$carat_group))
+stopifnot(sum(size_cut_summary$diamonds) == nrow(diamonds_data))
+
+cat("Checks passed: all observations are accounted for.\n")
+```
+
+# Conclusion
+
+This example demonstrates a common Tidyverse workflow: **create variables with `mutate()` and `case_when()`, aggregate with `group_by()` and `summarise()`, rank with `arrange()`, and visualize with `ggplot2`.** Looking at cut and price alone can obscure differences in diamond size; grouping by carat provides additional context. The results are descriptive, not causal: price may also depend on clarity, color, and other characteristics. A possible extension would use `filter()` or a regression model to examine diamonds with similar carat, clarity, and color.
+
+# Data source and reproducibility
+
+The dataset is `ggplot2::diamonds`, included in the [ggplot2 package](https://ggplot2.tidyverse.org/reference/diamonds.html). This vignette requires R and the packages `dplyr`, `ggplot2`, `knitr`, and `scales`. Install them if needed with `install.packages(c("dplyr", "ggplot2", "knitr", "scales"))`. To reproduce the analysis, open this `.qmd` in RStudio and select **Render**. No local data files are required.
