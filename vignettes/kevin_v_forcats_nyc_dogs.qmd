@@ -1,0 +1,252 @@
+---
+title: "Taming Messy Categories with forcats"
+subtitle: "A TidyVerse vignette using NYC dog license data"
+author: "Kevin Villa"
+date: today
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+  message: false
+---
+
+## Overview
+
+Categorical data in the real world is messy. The same thing is typed in different ways, there are hundreds of rare values, and "missing" shows up as words like "Unknown" instead of `NA`. The **forcats** package, part of the tidyverse, is built for exactly this. It works with *factors*, which is R's data type for categories.
+
+This vignette shows how to use forcats to clean up and summarize a messy categorical variable. The data is the **NYC Dog Licensing Dataset** from NYC Open Data. It has every dog licensed in New York City, with the dog's name, breed, sex, birth year, and the owner's ZIP code. Owners type in the breed themselves, so the breed column is a great example of messy categories.
+
+The forcats functions covered:
+
+| Function | What it does |
+|---|---|
+| `fct_infreq()` | Orders categories from most to least common |
+| `fct_lump_n()` | Keeps the top *n* categories and groups the rest into "Other" |
+| `fct_collapse()` | Combines several categories into one |
+| `fct_recode()` | Renames categories |
+| `fct_na_level_to_value()` | Turns a placeholder like "Unknown" into a real `NA` |
+| `fct_relevel()` | Moves a category to a chosen position |
+| `fct_reorder()` | Orders categories by another variable |
+| `fct_rev()` | Reverses the order |
+| `fct_drop()` | Removes categories that no longer have any rows |
+
+## Load the data
+
+```{r}
+library(readr)
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(forcats)
+library(ggplot2)
+
+dogs_raw <- read_csv(
+  "https://data.cityofnewyork.us/api/views/nu7n-tubp/rows.csv?accessType=DOWNLOAD",
+  col_types = cols(ZipCode = col_character(), .default = col_guess())
+)
+
+nrow(dogs_raw)
+glimpse(dogs_raw)
+```
+
+I read `ZipCode` as text. ZIP codes are labels, not numbers, and a few entries in this column aren't valid ZIP codes, which causes parsing problems if R treats them as numbers.
+
+The dataset is built from yearly snapshots (`Extract Year`), so a dog with an active license can show up in more than one snapshot. I removed rows that are exact copies on every field except the snapshot year.
+
+```{r}
+dogs <- dogs_raw |>
+  select(-`Extract Year`) |>
+  distinct() |>
+  mutate(
+    license_year = year(mdy(LicenseIssuedDate)),
+    breed = str_to_title(str_squish(BreedName)),
+    name  = str_to_title(AnimalName)
+  )
+
+nrow(dogs)
+n_distinct(dogs$breed)
+```
+
+`str_to_title()` from stringr fixes capitalization, so "COCKAPOO" and "Cockapoo" become the same value. Even after that, there are `r n_distinct(dogs$breed)` different breeds, which is far too many to read in a chart.
+
+## The problem: too many categories
+
+Here is what happens when we plot the breed column as it is.
+
+```{r}
+dogs |>
+  count(breed, sort = TRUE) |>
+  head(10)
+```
+
+There are three problems:
+
+1. **"Unknown" is listed as if it were a breed.** It's really missing data.
+2. **The same breed has several names.** "French Bulldog" and "Bull Dog, French" are both in the data, and pit bulls appear under several labels.
+3. **There are hundreds of rare breeds.** Most appear only a few times.
+
+## Step 1: Turn "Unknown" into a real missing value with `fct_na_level_to_value()`
+
+```{r}
+dogs <- dogs |>
+  mutate(breed = fct_na_level_to_value(factor(breed), "Unknown"))
+
+sum(is.na(dogs$breed))
+```
+
+`factor()` turns the text column into a factor. Then `fct_na_level_to_value()` takes the "Unknown" category and turns it into `NA`, so R treats those dogs as missing instead of counting "Unknown" as the most popular breed.
+
+## Step 2: Combine spellings of the same breed with `fct_collapse()`
+
+```{r}
+dogs <- dogs |>
+  mutate(breed = fct_collapse(breed,
+    "French Bulldog"   = c("French Bulldog", "Bull Dog, French"),
+    "English Bulldog"  = c("Bull Dog, English", "Bulldog"),
+    "Pit Bull"         = c("American Pit Bull Mix / Pit Bull Mix",
+                           "American Pit Bull Terrier/Pit Bull"),
+    "Labrador"         = c("Labrador Retriever", "Labrador Retriever Crossbreed"),
+    "Shih Tzu"         = c("Shih Tzu", "Shih Tzu Crossbreed"),
+    "Chihuahua"        = c("Chihuahua", "Chihuahua Crossbreed"),
+    "Yorkshire Terrier" = c("Yorkshire Terrier", "Yorkshire Terrier Crossbreed")
+  ))
+
+n_distinct(dogs$breed)
+```
+
+`fct_collapse()` takes a new name on the left and a list of old names on the right, and merges them into one category. Breeds that aren't listed stay the same. If a listed name doesn't exist in the data, forcats gives a warning and skips it, so the code still runs.
+
+## Step 3: Keep the top breeds with `fct_lump_n()` and order them with `fct_infreq()`
+
+```{r}
+top_breeds <- dogs |>
+  filter(!is.na(breed)) |>
+  mutate(breed = breed |>
+           fct_lump_n(n = 12, other_level = "All other breeds") |>
+           fct_infreq() |>
+           fct_relevel("All other breeds", after = Inf))
+
+levels(top_breeds$breed)
+```
+
+`fct_lump_n(n = 12)` keeps the 12 most common breeds and puts everything else into one group called "All other breeds." `fct_infreq()` then orders the categories from most to least common, so a chart shows them in a sensible order without any extra sorting. Because "All other breeds" is the biggest group, it would land first, so `fct_relevel(..., after = Inf)` moves it to the end.
+
+```{r}
+#| fig-height: 5
+top_breeds |>
+  filter(breed != "All other breeds") |>
+  ggplot(aes(y = fct_rev(breed))) +
+  geom_bar(fill = "#2a78d6") +
+  labs(title = "Most common licensed dog breeds in NYC",
+       x = "Dogs", y = NULL) +
+  theme_minimal()
+```
+
+`fct_rev()` flips the order so the most common breed is at the top of a horizontal bar chart. Without it, ggplot would put the first category at the bottom. I left "All other breeds" off the chart. Combined, it's bigger than all 12 top breeds together, and it would squash the other bars.
+
+## Step 4: Group related breeds into a new category with `fct_collapse()` and `other`
+
+Collapsing also works for building new groups. Here I group every poodle mix into one "Doodle" category to see whether these mixes are becoming more popular.
+
+```{r}
+doodles <- c("Goldendoodle", "Labradoodle", "Maltipoo", "Cockapoo",
+             "Cock A Poo", "Poodle Crossbreed", "Goldendoodle Miniature",
+             "Bernedoodle", "Cavapoo", "Shih-Poo", "Yorkipoo", "Aussiedoodle")
+
+doodle_trend <- dogs |>
+  filter(!is.na(breed), between(license_year, 2015, 2025)) |>
+  mutate(group = fct_collapse(breed,
+                              "Doodle or poodle mix" = intersect(doodles, levels(breed)),
+                              other_level = "Every other breed")) |>
+  count(license_year, group) |>
+  group_by(license_year) |>
+  mutate(share = n / sum(n)) |>
+  ungroup() |>
+  filter(group == "Doodle or poodle mix")
+
+ggplot(doodle_trend, aes(license_year, share)) +
+  geom_line(color = "#2a78d6", linewidth = 1) +
+  geom_point(color = "#2a78d6", size = 2.5) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = 2015:2025) +
+  labs(title = "Share of new NYC dog licenses that are doodles or poodle mixes",
+       x = "Year license was issued", y = NULL) +
+  theme_minimal()
+```
+
+The `other_level` argument puts every breed not in the list into a single "Every other breed" category, so there are only two groups to compare. `intersect()` keeps only the doodle names that actually appear in the data. In `r min(doodle_trend$license_year)`, doodles and poodle mixes made up `r scales::percent(doodle_trend$share[1], accuracy = 0.1)` of new licenses, and in `r max(doodle_trend$license_year)` they made up `r scales::percent(doodle_trend$share[nrow(doodle_trend)], accuracy = 0.1)`.
+
+## Step 5: Order breeds by another variable with `fct_reorder()`
+
+Which breeds are the oldest dogs in the city? `fct_reorder()` orders categories by a summary of another column, here the median birth year.
+
+```{r}
+#| fig-height: 5
+breed_age <- dogs |>
+  filter(!is.na(breed), between(AnimalBirthYear, 1990, 2026)) |>
+  mutate(breed = fct_lump_n(breed, n = 12, other_level = "All other breeds")) |>
+  filter(breed != "All other breeds")
+
+ggplot(breed_age, aes(x = AnimalBirthYear,
+                      y = fct_reorder(breed, AnimalBirthYear, .fun = median))) +
+  geom_boxplot(fill = "#cfe0f5", color = "#2a78d6", outlier.alpha = 0.2) +
+  labs(title = "Birth year of licensed dogs, by breed",
+       subtitle = "Breeds ordered by median birth year (older breeds at the bottom)",
+       x = "Birth year", y = NULL) +
+  theme_minimal()
+```
+
+Without `fct_reorder()`, the breeds would appear in alphabetical order, and the pattern would be hard to see. Ordering by median birth year puts breeds with older dogs at one end and breeds with younger dogs at the other. I filtered out birth years before 1990, since a few entries are clearly typos.
+
+## Step 6: Rename categories with `fct_recode()`
+
+```{r}
+dogs |>
+  mutate(sex = fct_recode(AnimalGender, "Female" = "F", "Male" = "M")) |>
+  count(sex)
+```
+
+`fct_recode()` renames categories using `"new name" = "old name"`. Here it turns the one-letter codes into labels that read better in a table or chart.
+
+## Bonus: The most popular dog names
+
+Every function above works on any messy category, not just breeds. Dog names have the same problems: placeholders like "Unknown" and "Name Not Provided," and thousands of rare names.
+
+```{r}
+#| fig-height: 5
+top_names <- dogs |>
+  mutate(name = name |>
+           factor() |>
+           fct_na_level_to_value(c("Unknown", "Name Not Provided", "Name"))) |>
+  filter(!is.na(name)) |>
+  mutate(name = name |> fct_lump_n(n = 15) |> fct_infreq()) |>
+  filter(name != "Other") |>
+  mutate(name = fct_drop(name))
+
+ggplot(top_names, aes(y = fct_rev(name))) +
+  geom_bar(fill = "#2a78d6") +
+  labs(title = "Most popular dog names in NYC", x = "Dogs", y = NULL) +
+  theme_minimal()
+```
+
+The same three steps clean up the names: mark the placeholders as missing, lump the rare names, and order by frequency. After filtering out "Other," the category still exists in the factor even though no rows use it, so `fct_drop()` removes it. `r levels(top_names$name)[1]` is the most popular dog name in the data.
+
+## Summary
+
+| Problem | forcats solution |
+|---|---|
+| A placeholder like "Unknown" counted as a real category | `fct_na_level_to_value()` |
+| The same category spelled several ways | `fct_collapse()` |
+| Too many rare categories | `fct_lump_n()` |
+| Categories in a random or alphabetical order | `fct_infreq()`, `fct_reorder()`, `fct_relevel()` |
+| Unclear labels | `fct_recode()` |
+| Charts upside down | `fct_rev()` |
+
+The key idea is that a factor keeps both the values and the *order* of the categories, and forcats lets you change that order and those categories without touching the underlying data.
+
+## Source
+
+- NYC Department of Health and Mental Hygiene. *NYC Dog Licensing Dataset*. NYC Open Data. <https://data.cityofnewyork.us/Health/NYC-Dog-Licensing-Dataset/nu7n-tubp>
+- Wickham, H. *forcats: Tools for Working with Categorical Variables (Factors)*. <https://forcats.tidyverse.org>
