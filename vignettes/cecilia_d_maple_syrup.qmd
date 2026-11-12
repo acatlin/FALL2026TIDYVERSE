@@ -66,6 +66,7 @@ state_averages <- state_averages %>%
 #Use `slice_max()` to create a shortlist of the top five states by average yield
 top_states <- state_averages %>%
   slice_max(order_by = avg_yield, n = 5)
+top_states
 ```
 
 ## Investigate an interesting finding
