@@ -72,7 +72,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Cecilia D
-Initial Description and Link: _TBD_
+Initial Description and Link: dplyr to explore USDA maple syrup yield data — [cecilia_d_maple_syrup.qmd](vignettes/cecilia_d_maple_syrup.qmd)
 
 Revision/Addition Description and Link: _TBD_
 

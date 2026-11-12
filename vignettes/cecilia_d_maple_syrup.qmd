@@ -1,0 +1,89 @@
+---
+title: "TidyVerse CREATE assignment"
+author: "Cecilia De La Fuente Chavez"
+format: html
+execute:
+  echo: true
+editor: visual
+---
+
+## Introduction
+
+This example uses `dplyr` to analyze USDA maple syrup yield data. And combines functions like `filter()`, `mutate()`, `group_by(),` `summarise()`, and `slice_max()`, to explore differences in average yield per tap across states.
+
+## Load and prepare the data
+
+```{r}
+#Load the tidyverse package
+library(tidyverse)
+
+#Import the CSV from URL
+maple_data <- read_csv("https://raw.githubusercontent.com/ceciliadelafuentech/DATA607/refs/heads/main/datasets/maple_data.csv")
+```
+
+```{r}
+#Convert Value column to numeric
+maple_data <- maple_data %>%
+  mutate(Value = as.numeric(Value))
+```
+
+```{r}
+#Data includes national and state records, filter out national records and create a subset df
+maple_state <- maple_data %>%
+  filter(`Geo Level` == "STATE")
+```
+
+## Analyze average yield by state
+
+```{r}
+#Group by state and calculate the average maple syrup yield per tap for each, and include column for years reported as some states have fewer records
+state_averages <- maple_state %>%
+  group_by(State) %>%
+  summarise(
+    avg_yield = mean(Value, na.rm = TRUE),
+    years_reported = n_distinct(Year[!is.na(Value)])
+  )
+```
+
+```{r}
+#Arrange the results from highest to lowest average yield
+state_averages <- state_averages %>%
+  arrange(desc(avg_yield))
+state_averages
+```
+
+## Rank states by average yield
+
+```{r}
+#Use `min_rank()` to add a ranking column based on average yield
+state_averages <- state_averages %>%
+  mutate(
+    yield_rank = min_rank(desc(avg_yield))
+  )
+```
+
+```{r}
+#Use `slice_max()` to create a shortlist of the top five states by average yield
+top_states <- state_averages %>%
+  slice_max(order_by = avg_yield, n = 5)
+```
+
+## Investigate an interesting finding
+
+It was interesting to find Minnesota, a state with only 6 years of reported records ranked #4 on average yield producing as much as states with a longer reported history
+
+```{r}
+#Look at the average yield for each reported year
+maple_state %>%
+  filter(State == "MINNESOTA") %>%
+  select(Year, Value) %>%
+  arrange(Year)
+```
+
+## Conclusion
+
+This example demonstrated how `dplyr` can be used to clean, summarize, and analyze agricultural data. I filtered observations, grouped by state, calculated average yields, and ranked results to identify differences in yearly maple syrup yield per tap across 13 states.
+
+Vermont had the highest historical average yield at 0.298 gallons per tap, while Minnesota, despite having only six reported years ranked fourth. Looking at Minnesota's individual observations, showed their increase in yield over the years, ramping up production fast enough to match the averages of long established producers.
+
+Overall, this example shows how `dplyr` functions can help produce statistical summaries and support exploration of patterns in agricultural production.
