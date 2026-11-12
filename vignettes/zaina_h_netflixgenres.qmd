@@ -1,0 +1,118 @@
+---
+title: "Tidying Netflix Genres with tidyr and dplyr"
+author: "Zaina Hassan"
+format: html
+execute:
+  warning: false
+  message: false
+---
+
+## Introduction
+
+This vignette demonstrates how to turn comma separated categories into tidy rows using `tidyr::separate_longer_delim()`, then summarize and visualize the results with `dplyr` and `ggplot2`. 
+The example uses the [Netflix Movies and TV Shows dataset](https://www.kaggle.com/datasets/shivamb/netflix-shows) from Kaggle.
+
+## 1. Load packages and import data
+
+Note: Install `tidyverse` if necessary: `install.packages("tidyverse")`.
+
+```{r}
+library(tidyverse)
+netflix <- read_csv(
+  "https://raw.githubusercontent.com/zxinah/DATA-607-Data-Acquisition-Management-/refs/heads/main/netflix_titles.csv"
+)
+
+glimpse(netflix)
+
+# Keep the fields relevant 
+netflix_small <- netflix %>%
+  select(show_id, title, type, release_year, listed_in)
+
+glimpse(netflix_small)
+```
+
+## 2. Column Tidying
+
+The `listed_in` column may contain multiple categories separated by commas. Each row represents a title, but the category field contains several values. To count categories individually, there should be one title category pair per row.
+
+```{r}
+netflix_small %>%
+  select(title, listed_in) %>%
+  slice_head(n = 6)
+```
+
+## 3. Separate categories into rows
+
+`separate_longer_delim()` splits a character field on a specified delimiter and duplicates the other columns as needed. `str_trim()` removes spaces surrounding category names. `filter()` removes empty or missing values.
+
+```{r}
+netflix_tidy <- netflix_small %>%
+  filter(!is.na(listed_in), listed_in != "") %>%
+  separate_longer_delim(listed_in, delim = ",") %>%
+  mutate(genre = str_trim(listed_in)) %>%
+  filter(genre != "") %>%
+  select(-listed_in)
+
+netflix_tidy %>%
+  select(title, type, genre) %>%
+  slice_head(n = 10)
+```
+
+**Interpretation:** A single title can now appear in multiple rows, once for each category. These are category assignments, not duplicate titles.
+
+## 4. Count and sort categories
+
+`count()` groups by the specified variable and counts rows; `arrange()` sorts results. Because each title can have several categories, the category totals should not be added together to estimate the number of unique titles.
+
+```{r}
+genre_counts <- netflix_tidy %>%
+  count(genre, name = "titles") %>%
+  arrange(desc(titles))
+
+genre_counts %>% slice_head(n = 10)
+```
+
+## 5. Compare movies and TV shows
+
+`filter()` can isolate one type of content. Here, `count()` also demonstrates how to group by two variables simultaneously.
+
+```{r}
+movie_genres <- netflix_tidy %>%
+  filter(type == "Movie") %>%
+  count(genre, sort = TRUE, name = "movie_titles")
+
+movie_genres %>% slice_head(n = 8)
+
+by_type <- netflix_tidy %>%
+  count(type, genre, name = "titles") %>%
+  arrange(type, desc(titles))
+
+by_type %>% slice_head(n = 10)
+```
+
+## 6. Visualize the ten most common categories
+
+`ggplot2` turns the summary table into a horizontal bar chart. `reorder()` arranges the category labels by their counts.
+
+```{r}
+#| fig-width: 9
+#| fig-height: 5.5
+
+genre_counts %>%
+  slice_max(order_by = titles, n = 10, with_ties = FALSE) %>%
+  ggplot(aes(x = reorder(genre, titles), y = titles)) +
+  geom_col(fill = "#C62798") +
+  coord_flip() +
+  labs(
+    title = "Ten Most Common Netflix Content Categories",
+    x = "Category",
+    y = "Number of titles"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Conclusion
+
+This demonstrates how `separate_longer_delim()` converts a multi-value column into a tidy, analysis-ready structure. `mutate()` and `str_trim()` clean the resulting text, while `filter()`, `count()`, and `arrange()` support comparisons across content categories. Finally, `ggplot2` visualizes the category frequencies. This workflow can also be applied to survey answers, product tags, and other comma separated fields.
+
+**Data source:** [Netflix Movies and TV Shows on Kaggle](https://www.kaggle.com/datasets/shivamb/netflix-shows).
