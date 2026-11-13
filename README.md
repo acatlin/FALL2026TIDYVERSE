@@ -137,7 +137,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Jocelyn S
-Initial Description and Link: _TBD_
+Initial Description and Link: Data Science: Into the Tidyverse. An exploration of the tidyverse using Marvel Comic Data. [Jocelyn_S_IntoTheTidyverse.qmd](vignettes/Jocelyn_S_IntoTheTidyverse.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
