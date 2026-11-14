@@ -1,0 +1,245 @@
+---
+title: "Exploring Online News Popularity with the Tidyverse"
+author: "Muhammad Imran"
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Introduction
+
+This vignette demonstrates how to use the **Tidyverse** to import, inspect, transform, summarize, and visualize an observational dataset. The dataset contains information about online news articles and the number of times each article was shared.
+
+The analysis focuses on two questions:
+
+1. How does the typical number of shares differ across article content channels?
+2. Does the typical number of shares differ by the day of publication?
+
+The analysis is descriptive. Differences in observed shares should not be interpreted as evidence that a channel or publication day causes an article to become more popular.
+
+## Packages and data source
+
+The Tidyverse packages used here are `readr`, `dplyr`, `tidyr`, `stringr`, `forcats`, and `ggplot2`.
+
+```{r}
+# Install the Tidyverse once if it is not already installed:
+# install.packages("tidyverse")
+
+library(tidyverse)
+
+# Read the CSV directly from the GitHub repository.
+data_url <- paste0(
+  "https://raw.githubusercontent.com/Muhammad-Imran91/607/",
+  "main/OnlineNewsPopularity.csv"
+)
+
+news_raw <- read_csv(data_url, show_col_types = FALSE)
+
+# Some versions of this dataset have leading spaces in column names.
+# trimws() removes those spaces so that columns can be referenced consistently.
+names(news_raw) <- trimws(names(news_raw))
+```
+
+## Inspect the data
+
+The first step is to understand the dataset's dimensions, variable names, and data types.
+
+```{r}
+# Number of rows and columns
+dim(news_raw)
+
+# Preview the first six records
+glimpse(news_raw)
+
+# Display the column names
+names(news_raw)
+
+# Check whether the outcome variable is available
+if (!"shares" %in% names(news_raw)) {
+  stop("The dataset does not contain the expected 'shares' column.")
+}
+```
+
+Each row represents an online news article. The `shares` variable records the number of times an article was shared. The dataset also contains indicator variables identifying the article's content channel and publication weekday.
+
+## Prepare the data
+
+The following steps retain observations with a valid, non-negative share count and create a log-transformed version of shares for visualization.
+
+```{r}
+news <- news_raw |>
+  mutate(shares = as.numeric(shares)) |>
+  filter(!is.na(shares), shares >= 0) |>
+  mutate(log_shares = log10(shares + 1))
+
+# Check the cleaned data
+glimpse(news)
+
+# Basic descriptive statistics for article shares
+news |>
+  summarise(
+    articles = n(),
+    minimum_shares = min(shares),
+    median_shares = median(shares),
+    mean_shares = mean(shares),
+    maximum_shares = max(shares)
+  )
+```
+
+The logarithmic transformation is used because article-share counts are typically right-skewed. Adding one before taking the logarithm allows articles with zero shares to remain in the analysis.
+
+## Question 1: How does popularity differ across content channels?
+
+The channel indicators are stored in separate columns. `pivot_longer()` converts these columns from wide format into a tidy, long format. This makes it easier to group articles by channel.
+
+```{r}
+# Identify the channel indicator columns automatically.
+channel_cols <- names(news) |>
+  keep(~ str_starts(.x, "data_channel_is_"))
+
+if (length(channel_cols) == 0) {
+  stop("No data_channel_is_ indicator columns were found.")
+}
+
+# Reshape channel indicators and retain articles assigned to a channel.
+channel_data <- news |>
+  mutate(article_id = row_number()) |>
+  select(article_id, shares, all_of(channel_cols)) |>
+  pivot_longer(
+    cols = all_of(channel_cols),
+    names_to = "channel",
+    values_to = "in_channel"
+  ) |>
+  filter(in_channel == 1) |>
+  mutate(
+    channel = str_remove(channel, "^data_channel_is_"),
+    channel = str_to_title(str_replace_all(channel, "_", " "))
+  )
+
+# Summarise article counts and share statistics by channel.
+channel_summary <- channel_data |>
+  group_by(channel) |>
+  summarise(
+    articles = n(),
+    median_shares = median(shares),
+    mean_shares = mean(shares),
+    .groups = "drop"
+  ) |>
+  arrange(desc(median_shares))
+
+channel_summary
+```
+
+The summary reports the number of articles and both the median and mean shares for each channel. The median is useful because a relatively small number of extremely popular articles can pull the mean upward.
+
+### Visualize channel popularity
+
+```{r}
+ggplot(
+  channel_data,
+  aes(
+    x = fct_reorder(channel, shares, .fun = median),
+    y = shares
+  )
+) +
+  geom_boxplot(outlier.alpha = 0.15) +
+  scale_y_log10(labels = scales::label_comma()) +
+  coord_flip() +
+  labs(
+    title = "Online News Shares by Content Channel",
+    subtitle = "Share counts are displayed on a logarithmic scale",
+    x = "Content channel",
+    y = "Number of shares (log scale)",
+    caption = "Source: OnlineNewsPopularity.csv"
+  ) +
+  theme_minimal()
+```
+
+**Interpretation:** Compare the median lines and the spread of the boxplots. Channels with higher median share counts have higher typical article shares in this dataset. The printed `channel_summary` table provides the exact values calculated from the data.
+
+## Question 2: Does popularity differ by publication weekday?
+
+The weekday indicators are also stored in separate columns. We can use `pivot_longer()` again to reshape them into a tidy structure.
+
+```{r}
+weekday_cols <- names(news) |>
+  keep(~ str_starts(.x, "weekday_is_"))
+
+if (length(weekday_cols) == 0) {
+  stop("No weekday_is_ indicator columns were found.")
+}
+
+weekday_data <- news |>
+  mutate(article_id = row_number()) |>
+  select(article_id, shares, all_of(weekday_cols)) |>
+  pivot_longer(
+    cols = all_of(weekday_cols),
+    names_to = "weekday",
+    values_to = "published_on_day"
+  ) |>
+  filter(published_on_day == 1) |>
+  mutate(
+    weekday = str_remove(weekday, "^weekday_is_"),
+    weekday = str_to_title(weekday),
+    weekday = factor(
+      weekday,
+      levels = c(
+        "Monday", "Tuesday", "Wednesday", "Thursday",
+        "Friday", "Saturday", "Sunday"
+      )
+    )
+  )
+
+weekday_summary <- weekday_data |>
+  group_by(weekday) |>
+  summarise(
+    articles = n(),
+    median_shares = median(shares),
+    mean_shares = mean(shares),
+    .groups = "drop"
+  ) |>
+  arrange(weekday)
+
+weekday_summary
+```
+
+### Visualize shares by weekday
+
+```{r}
+ggplot(
+  weekday_data,
+  aes(x = weekday, y = shares)
+) +
+  geom_boxplot(outlier.alpha = 0.15) +
+  scale_y_log10(labels = scales::label_comma()) +
+  labs(
+    title = "Online News Shares by Publication Weekday",
+    subtitle = "Share counts are displayed on a logarithmic scale",
+    x = "Publication weekday",
+    y = "Number of shares (log scale)",
+    caption = "Source: OnlineNewsPopularity.csv"
+  ) +
+  theme_minimal()
+```
+
+**Interpretation:** Compare the median shares and distributions across weekdays. The `weekday_summary` table provides the article counts, median shares, and mean shares for each day. These are descriptive comparisons and do not establish that publication day causes differences in popularity.
+
+## Conclusion
+
+This example demonstrates several important Tidyverse capabilities:
+
+- **`readr`:** importing a CSV file directly from GitHub.
+- **`dplyr`:** filtering observations, creating variables, grouping records, and calculating summary statistics.
+- **`tidyr`:** using `pivot_longer()` to transform indicator columns from wide to long format.
+- **`stringr`:** cleaning and standardizing channel and weekday labels.
+- **`forcats`:** ordering categories for a clearer plot.
+- **`ggplot2`:** visualizing the distribution of article shares across content channels and weekdays.
+
+The vignette illustrates how a collection of focused Tidyverse functions can turn a raw dataset into a reproducible exploratory analysis. The code calculates all reported statistics directly from the CSV, so the results update automatically if the source data changes.
+
+
