@@ -201,7 +201,8 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Muhammad I
-Initial Description and Link: _TBD_
+Initial Description and Link: This vignette demonstrates how to use the **Tidyverse** to import, inspect, transform, summarize, and visualize an observational dataset. The dataset contains information about online news articles and the number of times each article was shared.
+(Muhammad_I_online_news_popularity_analysis_using_tidyverse.qmd)[vignettes/Muhammad_I_online_news_popularity_analysis_using_tidyverse.qmd]
 
 Revision/Addition Description and Link: _TBD_
 
