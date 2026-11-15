@@ -1,0 +1,258 @@
+---
+title: "607 TIDYVERSE Enrique Delamonica"
+author: "Enrique Delamonica"
+format: html
+editor: visual
+---
+
+# Applying dplyr and ggplot to analyze the evolution of how women are portrayed in movies
+
+## What will be learned
+
+The objective of this simple vignette is to combine tidyvers (<https://tidyverse.org/packages/)> tools from two packages, dplyr and ggplot, to explore the evolution or trend of sample proportions.
+
+## Topic content and data
+
+For this assignment, I will use a the Bechdel-Wallace Test (<https://bechdeltest.com/about/)> database publicly available at FiveThirtyEight (<https://data.fivethirtyeight.com/).> The Bechdel-Wallace Test is used to classify the representation of women in movies according to three criteria: (1) there are at least two women, with names, in the movie, (2) they talk to each other, and (3) at least once they talk about something else besides a man.
+
+The data at FiveThirtyEight includes 1,794 movies from the period 1970 to 2013. Besides title, release year, and other information about each movie, there is a variable called “clean-test”. This variable has results for each of the three elements of the Bechdel-Wallace test presented in the previous paragraph as well as the overall result (“ok”).
+
+## The objective of the vignette
+
+Calculate and show graphically if and how the proportion of movies that pass the Bechdel-Wallace Test changed between 1970 and 2013.
+
+## Getting started with the analysis: obtaining and exploring the data
+
+These are a few commands to include the libraries and data to be used which are needed before the analysis can be started. Often it is useful to see the errors and allow knitting to continue when there are errors. Thus, "error = TRUE" is included.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+### Get data from public GitHub
+
+The data for the exercise are retrieved from the publicly available FiveThirtyEight database.
+
+```{r retrieve data}
+url<- "https://raw.githubusercontent.com/fivethirtyeight/data/refs/heads/master/bechdel/movies.csv"
+```
+
+A data frame, called "movies" is created with the retrieved data.
+
+```{r create the data frame}
+movies<- read_csv(file = url, show_col_types = FALSE, progress = FALSE)
+```
+
+### Exploring the data
+
+There are two simple ways to explore the structure of the data frame. One is to take a peek at or "glimpse" it.
+
+```{r glimpse the data frame}
+glimpse(movies)
+```
+
+The other one shows the data in a tibble.
+
+```{r another way to expkore the data frame}
+movies
+```
+
+It is also useful to quickly find out the range of the years, given the interest in exploring how movies fare in the test throughout the years. While this information is available in the steps above (e.g. when using "glimpse"), it is difficult to see the full range of all the years.
+
+The summary command, which provides the maximum and the minimum for the variable "year" helps to quickly see this range.
+
+```{r finding time range}
+summary(movies$year)
+```
+
+The data set contains information for the years between 1970 and 2013.
+
+As it is possible some years may have been skipped, the years can be counted.
+
+```{r number of years}
+movies|>
+  count(year)
+```
+
+The tibble has 44 rows. In other words, there are observations for 44 years, i.e. every year between 1970 and 2013.
+
+The column "n" shows the number of occurrences (movies) in each year. It is interesting to note only one movie from 1970 is included in the data frame.
+
+## Working with the data to assess the proportion of movies that pass the Bechdel-Wallace Test between 1970 and 2013 (applying dplyr tools)
+
+### Finding the amount (count) and proportion of movies passing the test
+
+In order to start exploring the variable of interest (the result of the Bechdel-Wallace test, i.e. the variable called "clean_test"), it is useful to count it.
+
+```{r exploring results of the Bechdel Wallace test}
+movies|>
+  count(clean_test)
+```
+
+There are five categories (dubious, men, notalk, nowomen, ok). While "ok" means the movie passed the test, "dubious" means the result is not clear or obvious. The category "nowomen" means there are no (or just one) female characters with names in the movie (the first element of the Bechdel-Wallace test). The category "notalk" means the women in the movie do not talk to each other (the second element of the Bechdel-Wallace test). The category "men" means that when women talk in the movie, they only talk about men (the tird element of the Bechdel-Wallace test).
+
+The column "n" provides the number of movies in each category or how many times each category occurs. It can be seen there are no missing values (the sum of the occurrences of each of the five categories equals the 1,794 observations in the data frame).
+
+### Grouping by year to facilitate the trend analysis
+
+Given the interest in finding out about the results of the Bechdel-Wallace test per year, the data frame "movies" can be grouped by year. This is the same command as the previous one, but the dplyr function "group_by" is being used to count the results of each category per year.
+
+```{r exploring results of the Bechdel Wallace test per year}
+movies|>
+  group_by(year)|>
+  count(clean_test)
+```
+
+It is interesting to note that the only movie from 1970 included in the data frame (this single occurrence was also noticed above when counting the movies per year) did pass the test.
+
+However, the count per se is not that useful. A count of one movie being OK when there is only one movie (as in 1970) is not as telling as when there is only one movie out of a hundred (i.e. only 1% are OK) of when all the 100 movies are OK (i.e. 100% of the movies are OK).
+
+Thus, the previous command is expanded by adding a new column using the mutate tool (from the dplyr package) to calculate a proportion (labeled "p"). This variable is calculated by dividing the count of occurrences, "n", out of the total number of cases, which is obtained by adding all the occurrences with "sum(n)".
+
+```{r proportion of test results}
+movies |> 
+  group_by(year)|>
+     count(clean_test) |>
+     mutate(p = n /sum(n))
+```
+
+Now it is possible to see, for every year, the proportion, "p", of movies passing the Bechdel-Wallace test (i.e. they show the result "OK" in the "clean_test" variable).
+
+This can be seen more clearly by adding another line in the command to focus only on the movies passing the test per year. This line uses another dplyr tool, filter, to select or filter only the cases (rows) where the result of the test is passing or being OK.
+
+```{r count and propotrion only for passing movies}
+movies |> 
+     group_by(year)|>
+     count(clean_test) |>
+     mutate(p = n /sum(n))|>
+ filter(clean_test == "ok")
+```
+
+This tibble has 42 rows instead of 44 (the number of years, as mentioned above). This means there are some years when no movie passed the test. This happens, for example, in 1971.
+
+As not all years are automatically shown, an additional line is included to "force" showing all the 42 years.
+
+```{r full list of count and propotrion only for passing movies}
+movies |> 
+     group_by(year)|>
+     count(clean_test) |>
+     mutate(p = n /sum(n))|>
+ filter(clean_test == "ok")|>
+  print(n=42)
+```
+
+The other year without a movie passing the test is 1975. It should be noticed this is not a missing value (NA). There is information about results of the test for 1975 (as well as for 1971). It was remarked above when counting the results for the variable "clean_test" that there is information for all the 1,794 movies. It just happens to be the case no movie passed the test in those two years, which is different from having no information.
+
+Except for the unusual fist year (1970) which, as mentioned above, only has one movie and it passes the test but it is followed by a year with no movie passing the test, there seems to be a positive trend, albeit in a bit of an irregular way.
+
+Nevertheless, during the 1970s the proportion of movies passing the test is about 25%-35%. During the 1980s the proportion reaches 40% several times. During the 1990s there are only a couple of years when the proportion is less than 40% but also it surpasses 55% a few times. Between the years 2001 and 2013, there is only case (2009) when the proportion is below 40%. Moreover, the 55% mark is surpassed a couple of times. Most observations are in the 40-55% range. However, the proportion of movies passing the test seems to have plateaued after 2009.
+
+## Constructing graphs to show trends (applying ggplot tools)
+
+Three graphs to illustrate these trends are produced. In order to start, a bar graph showing the total number of movies in each year can be created.
+
+```{r graph to be improved}
+ggplot(data = movies, aes(year)) + 
+  geom_bar()+
+  labs(title = "Fig. 1: A preliminary graph showing only the number of movies")
+```
+
+However, the movies passing the test are not shown. Only the total number of movies each year is shown.
+
+### Graph 1: stacked bar graph
+
+A line can be added to distribute the total number of movies among the five categories of results (i.e. using the five possible values for the variable "clean_test").
+
+```{r Graph 1 stacked bar graph}
+ggplot(data = movies, aes(year)) + 
+  geom_bar(aes(fill = clean_test))+
+  labs(title = "Fig. 2: GRAPH 1, increasing number of movies passing the Bechdel-Wallace test")
+```
+
+This graph clearly shows how, throughout the years, there have been more movies passing the test (and plateauing in the later years included in the data frame). However, it is difficult to see clearly if the proportion changed.
+
+### Graph 2: 100% graph
+
+Thus, secondly, a "stacked-100%" graph is introduced.
+
+```{r Graph 2 hundred percent graph}
+ggplot(data = movies, aes(year, fill = clean_test)) + 
+  geom_bar(position = "fill")+
+  labs(title = "Fig. 3: GRAPH 2, increasing share of movies passing the Bechdel-Wallace test")
+```
+
+In this graph it can be seen that, except for the year 1970 (for which there is only one movie in the data set as mentioned above) the share of movies passing the test increases throughout the 1980s and 1990s but plateaus in the latter years of the data set.
+
+### Graph 3: Scatter plots
+
+Before constructing the third graph, a further manipulation of the data frame is needed. Using the same dplyr tools as above, i.e. group by year, count the occurrences in the variable "clean_test", and calculating the proportion, a new data frame (called "moviesok") is created.
+
+```{r new data frame proprtions per year}
+moviesok<-movies |> 
+     group_by(year)|>
+     count(clean_test) |>
+     mutate(p = n /sum(n))
+```
+
+As it was done with the data frame "movies" it can be explored.
+
+```{r exporing the new data frame}
+moviesok
+```
+
+A scatter plot with these data can be generated.
+
+```{r  scatter plot categories mixed up}
+ggplot(data=moviesok, aes(year, p))+
+ geom_point()+
+  labs(title = "Fig. 4: A scatter plot which does not distinguish categories")
+```
+
+However, this graph is not very helpful as it does not distinguish the classification of movies according to the Bechdel-Wallace test. Thus, a line is added to the command in order to place each category in a different quadrant and show all the quadrants together.
+
+```{r Graph 3 separate scatter plots}
+ggplot(data=moviesok, aes(year, p))+
+ geom_point()+
+ facet_wrap(vars(clean_test))+
+  labs(title = "Fig. 5: GRAPH 3, increasing share of movies passing the Bechdel-Wallace test")
+```
+
+The pattern described above of a rising and plateauing proportion of movies passing the test between 1970 and 2013 can be seen. Moreover, it can also be seen that both the "no talk" and "no women" categories also improve, i.e. they decline. However, after around 2005, they plateau too.
+
+## Wrap-up
+
+In the introduction to the book by Wickham et al., "R for Data Science", there is a Figure (Figure 1, <https://r4ds.hadley.nz/intro.html#fig-ds-diagram)> which shows the main steps of data science projects. They can be summarized, in order, as:
+
+1.  Import the data
+
+2.  Tidy the data
+
+3.  Transform the data
+
+4.  Visualize the data
+
+5.  Model (which loops back to Transform the data)
+
+6.  Communicate
+
+In this simple vignette, there was no need to tidy the data. Thus, only steps for importing, transforming (applying dplyr tools), and visualizing (applying ggplot tools) the data are explained.
+
+## Further information is available at:
+
+For the group_by function <https://dplyr.tidyverse.org/reference/group_by.html>
+
+For the mutate function <https://dplyr.tidyverse.org/reference/mutate.html>
+
+For stacked bar graphs <https://ggplot2.tidyverse.org/reference/geom_bar.html>
+
+For 100% stacked bar graphs <https://ggplot2.tidyverse.org/articles/faq-bars.html>
+
+For Scatter plots: <https://ggplot2.tidyverse.org/reference/geom_point.html>
+
+For graphs with various quadrants: <https://ggplot2.tidyverse.org/reference/vars.html>
