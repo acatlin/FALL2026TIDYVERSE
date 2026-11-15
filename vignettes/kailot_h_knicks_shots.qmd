@@ -24,9 +24,9 @@ This vignette demonstrates how to use core tidyverse functions (`dplyr::filter()
 
 For this assignment, data will be loaded from the `hoopR` package to access shot-chart data for the New York Knicks.
 
-# Codebase
+## Codebase
 
-## Data loading
+### Data loading
 
 `hoopR::load_nba_shots()` downloads pre-scraped NBA shot events directly from public SportsDataverse releases, so no local data files are required. Here we load the complete 2025–26 NBA season (`seasons = 2026`).
 
@@ -39,7 +39,7 @@ library(hoopR)
 nba_shots <- load_nba_shots(seasons = 2026)
 ```
 
-##  Filtering to New York Knicks Field-Goal Attempts
+###  Filtering to New York Knicks Field-Goal Attempts
 
 In `hoopR`'s ESPN-sourced shot data, the New York Knicks are identified by `team_abbrev == "NY"`. We use `dplyr::filter()` and `stringr::str_detect()` to isolate Knicks field-goal attempts (excluding free throws) with valid court coordinates.
 
@@ -55,7 +55,7 @@ nyk_shots <- nba_shots |>
   )
 ```
 
-## Normalizing Court Coordinates and Classifying Shot Zones
+### Normalizing Court Coordinates and Classifying Shot Zones
 
 Teams switch baskets at halftime, so shots can appear on either end of the full court (`-47` to `+47` feet). Using `dplyr::mutate()` and `dplyr::case_when()`, we fold all attempts onto the left half-court (rim at `x = -41.75, y = 0`), compute shot distance in feet, and classify each attempt into basketball shot zones.
 
@@ -75,7 +75,7 @@ nyk_shots_clean <- nyk_shots |>
   )
 ```
 
-## Summarizing Shooting Efficiency by Zone
+### Summarizing Shooting Efficiency by Zone
 
 Using `dplyr::group_by()` and `dplyr::summarize()`, we calculate field-goal attempts, makes, field-goal percentage, average shot distance, and shot distribution across zones.
 
@@ -95,9 +95,9 @@ nyk_zone_summary <- nyk_shots_clean |>
 nyk_zone_summary
 ```
 
-## Visualizing the Knicks' Zone Efficiency
+### Visualizing the Knicks' Zone Efficiency
 
-### Field-Goal Percentage by Shot Zone
+#### Field-Goal Percentage by Shot Zone
 
 Using `forcats::fct_reorder()`, we order the shot zones by efficiency before plotting with `ggplot2`.
 
