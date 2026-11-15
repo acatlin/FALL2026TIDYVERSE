@@ -174,7 +174,7 @@ Revision/Addition Description and Link: _TBD_
 ### Lakeranie B
 Initial Description and Link: This project explores flight delays at JFK, LaGuardia, and Newark airports during 2013 using the nycflights13 dataset. I used Tidyverse packages such as dplyr and ggplot2 to clean, organize, and analyze flight records. The analysis compares departure delay rates by month and airline, using summary tables and visualizations to identify patterns.
 
-[View My NYC Flight Delays Vignette](vignettes/NYC%20flight%20delays.qmd)
+[View My NYC Flight Delays Vignette](vignettes/lakeranie_b_flight_delays.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
