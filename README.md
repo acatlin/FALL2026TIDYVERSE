@@ -57,7 +57,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Aniss S
-Initial Description and Link: _TBD_
+Initial Description and Link: lubridate date handling (`make_date()`, `ymd()`, `wday()`, `floor_date()`, `days_in_month()`, `weeks()`, `%m+%`) on FiveThirtyEight's daily US births data, ending with the Friday the 13th effect — [aniss_s_lubridate_births.qmd](vignettes/aniss_s_lubridate_births.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
