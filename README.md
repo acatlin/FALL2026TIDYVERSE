@@ -57,7 +57,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Aniss S
-Initial Description and Link: _TBD_
+Initial Description and Link: lubridate date handling (`make_date()`, `ymd()`, `wday()`, `floor_date()`, `days_in_month()`, `weeks()`, `%m+%`) on FiveThirtyEight's daily US births data, ending with the Friday the 13th effect — [aniss_s_lubridate_births.qmd](vignettes/aniss_s_lubridate_births.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -117,7 +117,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Ellie W
-Initial Description and Link: _TBD_
+Initial Description and Link: Exploring Electricity Mix Data with Tidyverse [ellie_w_tidyr_energy_mix.qmd](vignettes/ellie_w_tidyr_energy_mix.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -170,8 +170,11 @@ Revision/Addition Description and Link: _TBD_
 Initial Description and Link: `fct_lump_n()`, `fct_collapse()`, and other forcats functions on the NYC Dog Licensing dataset — [kevin_v_forcats_nyc_dogs.qmd](vignettes/kevin_v_forcats_nyc_dogs.qmd)
 
 Revision/Addition Description and Link: _TBD_
+
 ### Lakeranie B
-Initial Description and Link: _TBD_
+Initial Description and Link: This project explores flight delays at JFK, LaGuardia, and Newark airports during 2013 using the nycflights13 dataset. I used Tidyverse packages such as dplyr and ggplot2 to clean, organize, and analyze flight records. The analysis compares departure delay rates by month and airline, using summary tables and visualizations to identify patterns.
+
+[View My NYC Flight Delays Vignette](vignettes/Lakeranie_b_flight_delays.qmd)
 
 Revision/Addition Description and Link: _TBD_
 

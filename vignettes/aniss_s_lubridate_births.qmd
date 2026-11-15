@@ -1,0 +1,455 @@
+---
+title: "Working with Dates in lubridate"
+subtitle: "Weekdays, holidays and Friday the 13th in 15 years of US births"
+author: "Aniss Sahraoui"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    theme: flatly
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introduction
+
+Dates are one of the most common column types in real data and one of the easiest to get wrong.
+They arrive split across several columns or as text in different formats. Months have different
+lengths, and adding "one month" to January 31st has no obvious answer.
+
+**lubridate** is the tidyverse package for dates and times. It is installed and attached with the
+core `tidyverse` since version 2.0, so `library(tidyverse)` is all you need. This vignette walks
+through the parts of lubridate you are most likely to use:
+
+| Task | Functions |
+|---|---|
+| Build a date from parts or parse it from text | `make_date()`, `ymd()`, `mdy()`, `dmy()` |
+| Pull out components | `year()`, `month()`, `mday()`, `wday()`, `yday()` |
+| Round dates down to a unit | `floor_date()` |
+| Do arithmetic on dates | `days()`, `weeks()`, `months()`, `%m+%`, `days_in_month()` |
+| Periods versus durations | `years()` versus `dyears()` |
+
+Each function is shown on a toy example first, then used on a real dataset to answer a question.
+
+```{r}
+#| label: setup
+library(tidyverse)
+```
+
+## The dataset
+
+FiveThirtyEight published daily counts of US births from the Social Security Administration for
+2000 through 2014, alongside its article
+[*Some People Are Too Superstitious To Have A Baby On Friday The 13th*](https://fivethirtyeight.com/features/some-people-are-too-superstitious-to-have-a-baby-on-friday-the-13th/).
+The file is public on FiveThirtyEight's GitHub, so it is read straight from the URL and nothing needs
+downloading.
+
+```{r}
+#| label: load
+births_raw <- read_csv(
+  "https://raw.githubusercontent.com/fivethirtyeight/data/master/births/US_births_2000-2014_SSA.csv"
+)
+
+glimpse(births_raw)
+```
+
+There is one row per day, `r format(nrow(births_raw), big.mark = ",")` days in total. The date is
+split over three numeric columns, and the weekday is a code from 1 (Monday) to 7 (Sunday). Neither
+is a real date yet, so R cannot sort them by time, plot them on a time axis or do arithmetic on
+them.
+
+# Building and parsing dates
+
+## `make_date()`: from separate columns
+
+When the year, month and day sit in separate columns, `make_date()` combines them into a single
+`Date`.
+
+```{r}
+#| label: make-date-toy
+make_date(2014, 7, 4)
+class(make_date(2014, 7, 4))
+```
+
+Applied to the dataset:
+
+```{r}
+#| label: make-date
+births <- births_raw |>
+  mutate(date = make_date(year, month, date_of_month)) |>
+  select(date, births, day_of_week)
+
+head(births)
+range(births$date)
+```
+
+## `ymd()` and friends: from text
+
+When a date arrives as text, the parsing function is named after the **order** of its parts: `y`,
+`m`, `d`. lubridate figures out the separators on its own, which is what makes these functions so
+much easier than `as.Date()` with a format string.
+
+```{r}
+#| label: parse-text
+ymd("2014-07-04")
+ymd("20140704")
+mdy("July 4, 2014")
+mdy("07/04/2014")
+dmy("04.07.2014")
+```
+
+All five return the same date. A string that does not match the order fails with a warning and
+returns `NA`, rather than silently producing a wrong date:
+
+```{r}
+#| label: parse-fail
+ymd("07/04/2014")
+```
+
+# Extracting components
+
+Once a column is a real `Date`, one function call pulls out any component.
+
+```{r}
+#| label: extract-toy
+d <- ymd("2014-07-04")
+
+tibble(
+  call   = c("year(d)", "month(d)", "month(d, label = TRUE)", "mday(d)",
+             "wday(d, label = TRUE)", "yday(d)"),
+  result = c(year(d), month(d), as.character(month(d, label = TRUE)), mday(d),
+             as.character(wday(d, label = TRUE)), yday(d))
+) |>
+  knitr::kable()
+```
+
+`label = TRUE` returns an **ordered factor** (`Jan < Feb < ...`), not a character string, so charts
+and tables come out in calendar order rather than alphabetical order.
+
+## A check worth making: `week_start`
+
+`wday()` counts Sunday as day 1 by default, the US convention. This dataset counts Monday as day
+1. Setting `week_start = 1` makes lubridate agree, which also gives a quick check that the dates
+were built correctly:
+
+```{r}
+#| label: week-start
+all(wday(births$date, week_start = 1) == births$day_of_week)
+```
+
+Every one of the `r format(nrow(births), big.mark = ",")` weekdays matches, so the supplied column
+is no longer needed. From here on everything comes from `date` alone.
+
+```{r}
+#| label: add-components
+births <- births |>
+  select(date, births) |>
+  mutate(
+    year    = year(date),
+    month   = month(date, label = TRUE),
+    weekday = wday(date, label = TRUE, week_start = 1)
+  )
+```
+
+## Question: which day of the week has the fewest births?
+
+```{r}
+#| label: weekday
+overall_mean <- mean(births$births)
+
+by_weekday <- births |>
+  group_by(weekday) |>
+  summarise(avg_births = mean(births)) |>
+  mutate(vs_average = avg_births / overall_mean - 1)
+
+by_weekday |>
+  mutate(avg_births = round(avg_births),
+         vs_average = scales::percent(vs_average, accuracy = 0.1)) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: weekday-plot
+#| fig-height: 3.5
+ggplot(by_weekday, aes(weekday, avg_births)) +
+  geom_col(fill = "steelblue") +
+  geom_hline(yintercept = overall_mean, linetype = "dashed") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = NULL, y = "Average births per day",
+       title = "Far fewer babies are born on weekends",
+       subtitle = "US, 2000-2014. Dashed line = overall daily average")
+```
+
+The effect is large. Sunday averages about a third fewer births than the typical day. Biology does
+not work on a weekly schedule, but hospitals do: planned caesarean sections and inductions are
+booked on weekdays. Because `weekday` is an ordered factor, the bars appear Monday to Sunday
+without any extra sorting.
+
+# Months have different lengths
+
+A natural next question is which month has the most births. The obvious approach, summing births
+by month, gives a misleading answer:
+
+```{r}
+#| label: month-total
+births |>
+  group_by(month) |>
+  summarise(total_births = sum(births)) |>
+  arrange(total_births) |>
+  head(3)
+```
+
+February comes out lowest mainly because it is shorter. `days_in_month()` returns the length of
+the month a date falls in, and it accounts for leap years:
+
+```{r}
+#| label: dim-toy
+days_in_month(ymd(c("2013-02-10", "2012-02-10", "2014-09-10")))
+```
+
+Dividing by the number of days gives a fair comparison. Equivalently, take the mean of the daily
+counts:
+
+```{r}
+#| label: month-rate
+by_month <- births |>
+  group_by(month) |>
+  summarise(
+    total_births   = sum(births),
+    days           = n(),
+    births_per_day = mean(births)
+  )
+
+by_month |>
+  arrange(births_per_day) |>
+  mutate(across(c(total_births, births_per_day), \(x) format(round(x), big.mark = ","))) |>
+  knitr::kable()
+```
+
+Adjusted for length, February is no longer lowest. January is, and **September is highest**,
+consistent with conceptions around the winter holidays. The two months are about 10% apart.
+
+# Rounding dates with `floor_date()`
+
+`floor_date()` rounds a date **down** to the start of a unit: week, month, quarter or year. It is
+the standard way to aggregate daily data to a coarser time scale while keeping a real date that
+plots correctly. (`ceiling_date()` and `round_date()` round up and to the nearest unit.)
+
+```{r}
+#| label: floor-toy
+d <- ymd("2014-07-04")
+floor_date(d, "week", week_start = 1)
+floor_date(d, "month")
+floor_date(d, "quarter")
+floor_date(d, "year")
+```
+
+```{r}
+#| label: floor-monthly
+#| fig-height: 3.5
+monthly <- births |>
+  mutate(month_start = floor_date(date, "month")) |>
+  group_by(month_start) |>
+  summarise(births_per_day = mean(births))
+
+ggplot(monthly, aes(month_start, births_per_day)) +
+  geom_line(colour = "grey50") +
+  geom_smooth(se = FALSE, span = 0.3, colour = "steelblue") +
+  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = NULL, y = "Average births per day",
+       title = "Births peaked in 2007, then fell after the recession",
+       subtitle = "Monthly averages, aggregated with floor_date(date, \"month\")")
+```
+
+Because `month_start` is still a `Date`, `scale_x_date()` can place breaks every two years and
+format them with `date_labels`. If the grouping column had been built with `paste(year, month)`,
+the axis would be text and both of those would be lost. The chart shows the seasonal wave
+repeating each year on top of a trend that rose to 2007 and declined after the 2008 recession.
+
+# Date arithmetic
+
+## Periods: `days()`, `weeks()`, `months()`
+
+Periods add calendar units to a date:
+
+```{r}
+#| label: period-toy
+d <- ymd("2014-07-04")
+d + days(1)
+d - weeks(1)
+d + months(2)
+```
+
+`weeks(1)` is the useful one in this dataset. The date exactly one week earlier or later falls on
+the **same weekday**, which is how to compare a special day against normal days without the
+weekend effect from section 3 getting in the way.
+
+## The month-end trap and `%m+%`
+
+Adding months is ambiguous at the end of a month. There is no February 31st, so lubridate returns
+`NA` instead of guessing:
+
+```{r}
+#| label: month-trap
+ymd("2014-01-31") + months(1)
+```
+
+The `%m+%` operator rolls back to the last valid day of the month instead, which is usually what a
+billing date or a monthly report needs:
+
+```{r}
+#| label: month-safe
+ymd("2014-01-31") %m+% months(1)
+ymd("2014-01-31") %m+% months(1:3)
+```
+
+## Periods versus durations
+
+lubridate has two kinds of time spans. A **period** (`years()`, `months()`, `days()`) follows the
+calendar. A **duration** (`dyears()`, `ddays()`) is an exact number of seconds, and `dyears(1)` is
+always 365.25 days. Across a leap year they disagree:
+
+```{r}
+#| label: period-duration
+ymd("2012-01-01") + years(1)    # period: same calendar date next year
+ymd("2012-01-01") + dyears(1)   # duration: 365.25 days later
+```
+
+2012 had 366 days, so adding 365.25 days stops short of New Year's Day, at 6 a.m. on December 31st.
+The result is also a date-time rather than a date, because a duration counts seconds. For calendar
+questions like "the same date next year", use periods. Use durations when you need
+exact elapsed time, such as the length of an experiment.
+
+## Question: do births drop on holidays?
+
+To measure a holiday fairly, compare it with the same weekday one week before and one week after.
+A small helper does this with `weeks(1)` and two joins:
+
+```{r}
+#| label: neighbour-fn
+compare_to_neighbours <- function(days_of_interest) {
+  lookup <- births |> select(date, births)
+
+  days_of_interest |>
+    select(date, births) |>
+    mutate(week_before = date - weeks(1),
+           week_after  = date + weeks(1)) |>
+    left_join(lookup |> rename(births_before = births), by = c("week_before" = "date")) |>
+    left_join(lookup |> rename(births_after  = births), by = c("week_after"  = "date")) |>
+    # At the edges of the data (e.g. 1 Jan 2000) one neighbour is missing; use the other
+    mutate(reference = rowMeans(cbind(births_before, births_after), na.rm = TRUE),
+           vs_neighbours = births / reference - 1)
+}
+```
+
+Holidays are selected with `month()` and `mday()`, so no list of 15 separate dates is needed.
+
+```{r}
+#| label: holidays
+holidays <- tribble(
+  ~holiday,           ~m, ~d,
+  "New Year's Day",    1,  1,
+  "Valentine's Day",   2, 14,
+  "Independence Day",  7,  4,
+  "Halloween",        10, 31,
+  "Christmas Eve",    12, 24,
+  "Christmas Day",    12, 25
+)
+
+holiday_effect <- holidays |>
+  mutate(result = map2(m, d, \(m, d) {
+    births |>
+      filter(month(date) == m, mday(date) == d) |>
+      compare_to_neighbours() |>
+      summarise(years = n(), avg_change = mean(vs_neighbours))
+  })) |>
+  unnest(result) |>
+  arrange(avg_change)
+
+holiday_effect |>
+  transmute(holiday, years, avg_change = scales::percent(avg_change, accuracy = 0.1)) |>
+  knitr::kable()
+```
+
+Christmas Day has about a third fewer births than the same weekday a week either side, and
+Independence Day a quarter fewer. The pattern is the same as the weekend effect: scheduled
+deliveries are moved away from days when staff are off. Valentine's Day is the only date here
+with *more* births than its neighbours.
+
+## Question: is Friday the 13th avoided?
+
+This is the question from the FiveThirtyEight article. Every 13th of the month is compared with the
+6th and the 20th, which are exactly one week either side and so fall on the same weekday. The
+results are then grouped by the weekday of the 13th, so Friday can be compared with the other days.
+
+```{r}
+#| label: friday-13
+thirteenths <- births |>
+  filter(mday(date) == 13) |>
+  compare_to_neighbours() |>
+  mutate(weekday = wday(date, label = TRUE, week_start = 1))
+
+by_weekday_13 <- thirteenths |>
+  group_by(weekday) |>
+  summarise(occurrences = n(), avg_change = mean(vs_neighbours))
+
+by_weekday_13 |>
+  mutate(avg_change = scales::percent(avg_change, accuracy = 0.1)) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: friday-13-plot
+#| fig-height: 3.5
+ggplot(by_weekday_13, aes(weekday, avg_change, fill = weekday == "Fri")) +
+  geom_col() +
+  scale_fill_manual(values = c(`TRUE` = "firebrick", `FALSE` = "grey65"), guide = "none") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Weekday of the 13th", y = "Births vs. same weekday ±1 week",
+       title = "Friday the 13th has noticeably fewer births",
+       subtitle = "US, 2000-2014, each 13th compared with the 6th and 20th of the same month")
+```
+
+Every 13th has slightly fewer births than its neighbours, about 1-4% depending on the weekday.
+Friday the 13th stands out at roughly **6% fewer**, nearly double the next-lowest weekday (Thursday, about 3.6%). With 25
+Friday the 13ths in the data, the gap is consistent with the article's conclusion that some
+scheduled births are moved away from the date.
+
+# Summary
+
+| Function | What it does | Used here to |
+|---|---|---|
+| `make_date()` | Build a `Date` from year, month, day columns | Combine the three date columns |
+| `ymd()`, `mdy()`, `dmy()` | Parse text in a given order | Parse five formats of the same date |
+| `wday(label = TRUE, week_start = 1)` | Weekday as an ordered factor | Verify the data; weekday effect |
+| `month()`, `mday()`, `year()` | Extract a component | Group by month; select holidays and 13ths |
+| `days_in_month()` | Length of the month, leap-aware | Show why monthly totals mislead |
+| `floor_date()` | Round down to a unit | Aggregate days to months for a time series |
+| `weeks()`, `days()`, `months()` | Calendar periods | Find the same weekday a week away |
+| `%m+%` | Add months without producing `NA` | Handle month-end dates |
+| `years()` vs `dyears()` | Period vs exact duration | Show the leap-year difference |
+
+Three habits from this vignette carry over to any dataset with dates:
+
+1. **Convert to a real `Date` first.** Everything after that, including sorting, plotting,
+   rounding and arithmetic, depends on it.
+2. **Compare like with like.** Months of different lengths and days with different weekdays
+   produce misleading totals. Here `days_in_month()` and `weeks(1)` fixed that.
+3. **Use `label = TRUE`.** Ordered factors keep tables and charts in calendar order without extra
+   sorting.
+
+# References
+
+- Grolemund, G. and Wickham, H. (2011). Dates and Times Made Easy with lubridate. *Journal of
+  Statistical Software*, 40(3). <https://www.jstatsoft.org/v40/i03/>
+- Wickham, H., Çetinkaya-Rundel, M. and Grolemund, G. *R for Data Science* (2nd ed.), chapter
+  "Dates and times". <https://r4ds.hadley.nz/datetimes>
+- FiveThirtyEight. US births data, 2000-2014.
+  <https://github.com/fivethirtyeight/data/tree/master/births>
+- Bialik, C. (2016). Some People Are Too Superstitious To Have A Baby On Friday The 13th.
+  *FiveThirtyEight*.

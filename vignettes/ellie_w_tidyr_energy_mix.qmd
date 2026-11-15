@@ -1,0 +1,102 @@
+---
+title: "Electricity Mix Data"
+subtitle: "TidyVerse CREATE Assignment"
+author: "Ellie Wilser"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: left
+    number-sections: true
+    code-fold: false
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+---
+
+## Introduction
+
+For this assignment, I will be using the pivot functions in the TidyVerse Package.
+
+As an example, I use the [Our World in Data energy dataset](https://github.com/owid/energy-data),
+which reports what share of each country's electricity comes from each source
+(coal, gas, solar, wind and so on).
+
+## Load the Data
+
+The data is read straight from a public URL, so no local file is needed.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+energy <- read_csv(
+  "https://raw.githubusercontent.com/owid/energy-data/master/owid-energy-data.csv",
+  show_col_types = FALSE
+)
+
+dim(energy)
+```
+
+The dataset has over 100 columns. I keep the country, the year and the eight
+columns that give each individual source's share of electricity
+generation.
+
+```{r}
+countries <- c("United States", "Germany", "United Kingdom", "China", "India")
+
+elec_wide <- energy |>
+  filter(country %in% countries, year >= 1990) |>
+  select(
+    country, year,
+    coal_share_elec, gas_share_elec, oil_share_elec, nuclear_share_elec,
+    hydro_share_elec, wind_share_elec, solar_share_elec,
+    biofuel_share_elec
+  )
+
+head(elec_wide)
+```
+
+This data is in wide formatting, so I will use the pivot longer function.
+
+```{r}
+elec_long <- elec_wide |>
+  pivot_longer(
+    cols = ends_with("_share_elec"),
+    names_to = "source",
+    names_pattern = "(.*)_share_elec",
+    values_to = "share"
+  )
+
+head(elec_long, 10)
+```
+
+Some countries do not report every source in every year. Long data makes it
+easy to see exactly where the gaps are:
+
+
+## Data Visualization
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 6
+
+elec_long |>
+  mutate(source = fct_reorder(source, share, .fun = mean, .desc = TRUE)) |>
+  ggplot(aes(x = year, y = share, fill = source)) +
+  geom_area() +
+  facet_wrap(~ country) +
+  labs(
+    title = "Share of Electricity Generation by Source, 1990 onward",
+    x = NULL,
+    y = "Share of electricity (%)",
+    fill = "Source",
+    caption = "Source: Our World in Data"
+  ) +
+  theme_minimal()
+```
+
+=-
