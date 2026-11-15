@@ -67,7 +67,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Bikash B
-Initial Description and Link: _TBD_
+Initial Description and Link: Initial Description and Link: Explores income, poverty, and commuting patterns across New York City using dplyr and ggplot2 — [bikash_b_income_poverty_NYC.qmd](vignettes/bikash_b_income_poverty_NYC.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
