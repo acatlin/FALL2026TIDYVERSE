@@ -117,7 +117,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Ellie W
-Initial Description and Link: _TBD_
+Initial Description and Link: Exploring Electricity Mix Data with Tidyverse [ellie_w_tidyr_energy_mix.qmd](vignettes/ellie_w_tidyr_energy_mix.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
