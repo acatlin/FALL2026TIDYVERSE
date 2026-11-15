@@ -1,0 +1,122 @@
+---
+title: "DATA 607 - FALL2026TIDYVERSE"
+subtitle: "Visualizing NY Knicks Shot Zone Efficiency (2025-2026)"
+author: "Kailot C. Harris"
+date: "2026/11/14"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-overflow: wrap
+    theme:
+      dark: darkly
+      light: flatly
+execute: 
+  warning: false
+  message: false
+---
+
+## Introduction and Overview
+
+This vignette demonstrates how to use core tidyverse functions (`dplyr::filter()`, `stringr::str_detect()`, `dplyr::mutate()`, `dplyr::case_when()`, `dplyr::summarize()`, `forcats::fct_reorder()`, and `ggplot2`) to wrangle and visualize New York Knicks shot-chart data loaded via `hoopR::load_nba_shots()`.
+
+## Data source
+
+For this assignment, data will be loaded from the `hoopR` package to access shot-chart data for the New York Knicks.
+
+## Codebase
+
+### Data loading
+
+`hoopR::load_nba_shots()` downloads pre-scraped NBA shot events directly from public SportsDataverse releases, so no local data files are required. Here we load the complete 2025–26 NBA season (`seasons = 2026`).
+
+```{r}
+library(tidyverse)
+library(hoopR)
+```
+
+```{r}
+nba_shots <- load_nba_shots(seasons = 2026)
+```
+
+###  Filtering to New York Knicks Field-Goal Attempts
+
+In `hoopR`'s ESPN-sourced shot data, the New York Knicks are identified by `team_abbrev == "NY"`. We use `dplyr::filter()` and `stringr::str_detect()` to isolate Knicks field-goal attempts (excluding free throws) with valid court coordinates.
+
+```{r}
+nyk_shots <- nba_shots |>
+  filter(
+    team_abbrev == "NY",
+    !str_detect(coalesce(type_text, ""), regex("free throw", ignore_case = TRUE)),
+    !is.na(coordinate_x),
+    !is.na(coordinate_y),
+    abs(coordinate_x) <= 47,
+    abs(coordinate_y) <= 25
+  )
+```
+
+### Normalizing Court Coordinates and Classifying Shot Zones
+
+Teams switch baskets at halftime, so shots can appear on either end of the full court (`-47` to `+47` feet). Using `dplyr::mutate()` and `dplyr::case_when()`, we fold all attempts onto the left half-court (rim at `x = -41.75, y = 0`), compute shot distance in feet, and classify each attempt into basketball shot zones.
+
+```{r}
+nyk_shots_clean <- nyk_shots |>
+  mutate(
+    x_half = -abs(coordinate_x),
+    y_half = if_else(coordinate_x > 0, -coordinate_y, coordinate_y),
+    shot_distance = sqrt((x_half - (-41.75))^2 + y_half^2),
+    shot_zone = case_when(
+      shot_distance <= 8 ~ "Paint / Restricted Area",
+      (abs(y_half) >= 22 & x_half <= -33) | shot_distance >= 23.75 ~
+        if_else(abs(y_half) >= 22 & x_half <= -33, "Corner 3", "Above-the-Break 3"),
+      TRUE ~ "Mid-Range"
+    ),
+    shot_result = if_else(scoring_play, "Made", "Missed")
+  )
+```
+
+### Summarizing Shooting Efficiency by Zone
+
+Using `dplyr::group_by()` and `dplyr::summarize()`, we calculate field-goal attempts, makes, field-goal percentage, average shot distance, and shot distribution across zones.
+
+```{r}
+nyk_zone_summary <- nyk_shots_clean |>
+  group_by(shot_zone) |>
+  summarize(
+    attempts = n(),
+    made = sum(scoring_play, na.rm = TRUE),
+    fg_pct = made / attempts,
+    mean_distance_ft = mean(shot_distance, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(shot_share = attempts / sum(attempts)) |>
+  arrange(desc(attempts))
+
+nyk_zone_summary
+```
+
+### Visualizing the Knicks' Zone Efficiency
+
+#### Field-Goal Percentage by Shot Zone
+
+Using `forcats::fct_reorder()`, we order the shot zones by efficiency before plotting with `ggplot2`.
+
+```{r}
+nyk_zone_summary |>
+  mutate(shot_zone = fct_reorder(shot_zone, fg_pct)) |>
+  ggplot(aes(x = fg_pct, y = shot_zone, fill = shot_share)) +
+  geom_col() +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_fill_gradient(
+    low = "#006BB6",
+    high = "#F58426",
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  labs(
+    title = "NY Knicks Field-Goal Percentage by Shot Zone\n(2025–26)",
+    x = "Field-Goal Percentage (FG%)",
+    y = NULL,
+    fill = "Share of FGA"
+  ) +
+  theme_minimal()
+```

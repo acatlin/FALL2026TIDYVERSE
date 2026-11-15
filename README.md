@@ -152,7 +152,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Kailot H
-Initial Description and Link: _TBD_
+Initial Description and Link: `case_when()`, `summarize()`, `fct_reorder()`, and `ggplot2` on NY Knicks shot-chart data via `hoopR` — [kailot_h_knicks_shots.qmd](vignettes/kailot_h_knicks_shots.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
