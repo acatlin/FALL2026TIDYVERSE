@@ -1,0 +1,83 @@
+---
+title: "Analyzing Vehicle Fuel Efficiency with Tidyverse"
+author: "Muntasir M"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This vignette shows how TIdyverse functions can be applied to filter, transform, summarize, and visualize fuel efficiency data. We can use 'mpg' dataset within ggplot2 package to compare fuel efficiency through vehicle classes.
+
+## Load Package and Dataset
+
+```{r}
+library(tidyverse)
+
+data("mpg", package = "ggplot2")
+
+head(mpg)
+```
+
+## Filter
+
+```{r}
+mpg_2008 <- mpg %>%
+  filter(year == 2008)
+
+head(mpg_2008)
+```
+
+## New Variable
+
+```{r}
+mpg_2008 <- mpg_2008 %>%
+  mutate(mean_mpg = (cty + hwy) / 2)
+
+head(mpg_2008)
+```
+
+This creates a new column called 'mean_mpg.' A simple arithmetic mean but not the actual EPA combined MPG rating.
+
+## Group and Summarize Data
+
+```{r}
+mpg_summary <- mpg_2008 %>%
+  group_by(class) %>%
+  summarise(
+    vehicle_count = n(),
+    average_mpg = round(mean(mean_mpg), 2),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(average_mpg))
+
+mpg_summary
+```
+
+## Visualize Results
+
+```{r}
+ggplot(mpg_summary,
+       aes(x = reorder(class, average_mpg),
+           y = average_mpg)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Average Fuel Efficiency by Vehicle Class (2008)",
+    x = "Vehicle Class",
+    y = "Average City and Highway MPG"
+  ) +
+  theme_minimal()
+```
+
+The chart acts as a clear identification of which classes reach greater or lesser average fuel efficiency.
+
+## Conclusion
+
+This example showcases how Tidyverse packages simplify data analysis via filtering, transformation, grouping, summarizing, and visualization.
+
+Grouping dplyr and ggplot2 lets us transform raw vehicle data into compelling comparisons and relay findings graphically.
+
+## Dataset Used
+
+mpg found in ggplot2 R package
