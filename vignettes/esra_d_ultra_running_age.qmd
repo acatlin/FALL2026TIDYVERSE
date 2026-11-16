@@ -1,0 +1,263 @@
+---
+title: "Does Age Slow Down Ultramarathon Runners?"
+subtitle: "A worked example of left_join() and case_when()"
+author: "Esra Dogan"
+format: html
+---
+
+## Introduction
+
+Ultramarathons are races longer than a marathon, often around 100 miles through mountains. A natural question is: **does age slow runners down?**
+
+Answering this is harder than it looks. If we only compare finish times by age, we might be comparing an untrained 22-year-old with a 50-year-old who has been racing for decades. We would also ignore everyone who started a race but did not finish. So in this vignette I look at age together with **experience** and **finish rates**.
+
+This vignette focuses on two `dplyr` functions:
+
+- **`left_join()`**, to combine information stored in two separate tables.
+- **`case_when()`**, to turn numeric variables (age, number of races) into meaningful groups.
+
+Other familiar functions such as `filter()`, `mutate()`, and `summarise()` appear along the way without detailed explanation.
+
+## The data
+
+The data comes from the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday/tree/main/data/2021/2021-10-26) (originally from the International Trail Running Association). `read_csv()` can read a file directly from a URL, so nothing needs to be downloaded.
+
+```{r}
+#| message: false
+library(tidyverse)
+
+rankings <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2021/2021-10-26/ultra_rankings.csv")
+
+races <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2021/2021-10-26/race.csv")
+```
+
+There are two tables, and neither is enough on its own:
+
+- `rankings` is the results list: one row per runner per race, with age, gender, nationality, and finish time. It does not say how long the race was.
+- `races` is the race catalog: one row per race, with distance, elevation, country, and date. It does not say who ran.
+
+Race details are stored once in `races` instead of being repeated on every runner's row. The two tables are linked by `race_year_id`.
+
+```{r}
+glimpse(rankings)
+glimpse(races)
+```
+
+## Combining the tables with `left_join()`
+
+To compare runners across races of different lengths, I need each race's distance. But distance is stored in `races`, not in `rankings`. Both tables share the column `race_year_id`, so I can use it as a key.
+
+`left_join()` keeps every row of the left table (`rankings`) and adds the matching columns from the right table (`races`). If a race had no match, the new columns would be `NA`, but no runner rows would be lost.
+
+```{r}
+ultra <- rankings |>
+  left_join(races, by = "race_year_id")
+
+nrow(rankings)
+nrow(ultra)
+```
+
+The row count is unchanged, which confirms the join added columns without duplicating or dropping runners.
+
+### Checking the join
+
+Before trusting a join, it is worth checking two things. First, the key should be unique in the right table. If a race appeared twice in `races`, each of its runners would be duplicated.
+
+```{r}
+races |>
+  count(race_year_id) |>
+  filter(n > 1)
+```
+
+Zero rows means every race appears exactly once. Second, every runner row should find a matching race. `anti_join()` returns the rows of the left table that have **no** match in the right table.
+
+```{r}
+rankings |>
+  anti_join(races, by = "race_year_id") |>
+  nrow()
+```
+
+The result is 0, so every result is linked to a race.
+
+## Cleaning the data
+
+First I add two columns with `mutate()`:
+
+- `finished`: `TRUE` if the runner has a finish time. Runners without a time did not finish (DNF), and keeping them lets us study finish rates instead of looking only at "survivors."
+- `pace`: minutes per kilometer, so that races of slightly different lengths can be compared.
+
+```{r}
+ultra <- ultra |>
+  mutate(
+    finished = !is.na(time_in_seconds),
+    pace = time_in_seconds / 60 / distance
+  )
+```
+
+The data also has some obvious errors: ages of 0 or 133, races with a distance of 0, and a "runner" named *NO Participants* who covered 168 km in one hour. I keep only:
+
+- ages between 18 and 80,
+- races of at least 150 km (these are meant to be 100-mile races, about 161 km),
+- paces of at least 4 minutes per km. Anything faster would beat the 100-mile world record, so it must be a data error. Runners who did not finish have no pace (`NA`) and are kept.
+
+```{r}
+ultra_clean <- ultra |>
+  filter(
+    age >= 18, age <= 80,
+    distance >= 150,
+    is.na(pace) | pace >= 4
+  )
+
+nrow(ultra)
+nrow(ultra_clean)
+```
+
+About 10,500 rows are removed, most of them from races with a recorded distance of 0.
+
+Note the condition `is.na(pace) | pace >= 4`. Without the `is.na(pace)` part, `filter()` would silently drop every runner who did not finish, because `NA >= 4` is `NA`, and `filter()` keeps only rows where the condition is `TRUE`.
+
+## Measuring experience with `add_count()`
+
+The data has no "experience" column, but it can be built. Each row is one runner in one race, so a runner who raced five times appears in five rows. `add_count()` counts how often each runner appears and adds the result as a new column, without collapsing the rows the way `count()` would.
+
+Runners are identified by name, gender, and nationality together. This reduces, but does not eliminate, the chance that two different people with the same name are counted as one runner.
+
+```{r}
+ultra_clean <- ultra_clean |>
+  add_count(runner, gender, nationality, name = "n_races")
+```
+
+This is only an approximation: it counts races in this dataset, not a runner's whole career.
+
+## Creating groups with `case_when()`
+
+Age and number of races are numbers, but for comparison it is easier to work with groups. `case_when()` is a vectorized "if / else if" statement. Each line has the form `condition ~ value`.
+
+```{r}
+ultra_clean <- ultra_clean |>
+  mutate(
+    age_group = case_when(
+      age < 30 ~ "18-29",
+      age < 40 ~ "30-39",
+      age < 50 ~ "40-49",
+      age < 60 ~ "50-59",
+      age >= 60 ~ "60+"
+    ),
+    experience = case_when(
+      n_races == 1 ~ "1 race",
+      n_races <= 4 ~ "2-4 races",
+      n_races >= 5 ~ "5+ races"
+    )
+  )
+```
+
+Two things are worth knowing about `case_when()`:
+
+1. **Order matters.** Conditions are checked from top to bottom, and each row gets the value of the *first* condition that is true. That is why the second line can simply say `age < 40`: anyone under 30 was already caught by the first line.
+2. **Unmatched rows become `NA`.** If a row meets none of the conditions, it gets `NA`, so it is good practice to check the result.
+
+```{r}
+ultra_clean |> count(age_group)
+ultra_clean |> count(experience)
+```
+
+There are no `NA` groups, so every row was matched. Most ultramarathon runners are in their 40s and 50s. Runners under 30 are a small minority.
+
+## Does age matter?
+
+### Finish rate by age
+
+First, how often do runners in each age group finish the race?
+
+```{r}
+by_age <- ultra_clean |>
+  group_by(age_group) |>
+  summarise(
+    runners = n(),
+    finish_rate = mean(finished),
+    median_pace = median(pace, na.rm = TRUE)
+  )
+
+by_age
+```
+
+```{r}
+by_age |>
+  ggplot(aes(x = age_group, y = finish_rate)) +
+  geom_col(fill = "#0072B2", width = 0.6) +
+  geom_text(aes(label = scales::percent(finish_rate, accuracy = 1)), vjust = -0.5) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    title = "Older runners do not drop out more often",
+    subtitle = "Share of runners who finished the race, by age group",
+    x = "Age group",
+    y = "Finish rate"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+Finish rates do not fall with age. The **youngest** runners are actually the least likely to finish (about 77%), while runners in their 40s and 50s finish about 88% of the time. Older runners are slower when they finish: the median pace goes from about 10.9 minutes per km for the youngest group to about 12.4 for runners over 60. But they are not more likely to drop out.
+
+### Finish rate by experience
+
+Now the same question for experience instead of age.
+
+```{r}
+by_exp <- ultra_clean |>
+  group_by(experience) |>
+  summarise(
+    runners = n(),
+    finish_rate = mean(finished),
+    median_pace = median(pace, na.rm = TRUE)
+  )
+
+by_exp
+```
+
+```{r}
+by_exp |>
+  ggplot(aes(x = experience, y = finish_rate)) +
+  geom_col(fill = "#D55E00", width = 0.5) +
+  geom_text(aes(label = scales::percent(finish_rate, accuracy = 1)), vjust = -0.5) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    title = "More experienced runners finish more often",
+    subtitle = "Share of runners who finished the race, by number of races in the dataset",
+    x = "Experience",
+    y = "Finish rate"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+Here the pattern is clear and goes in one direction: the finish rate rises from about 83% for runners with a single race to about 93% for runners with five or more. Experienced runners are also faster, with a median pace of about 10.7 minutes per km compared with 12.7 for first-timers.
+
+### Age and experience together
+
+Finally, the table below splits each experience level by age group. It compares runners of different ages who have raced a similar number of times.
+
+```{r}
+ultra_clean |>
+  group_by(experience, age_group) |>
+  summarise(
+    runners = n(),
+    finish_rate = mean(finished),
+    median_pace = median(pace, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+Within every experience level, pace still slows with age, so age does have an effect on speed. But runners with five or more races finish more than 90% of the time at every age, and runners over 60 in that group are about as fast as first-time runners under 30 (about 11.3 vs. 11.4 minutes per km).
+
+## Conclusion
+
+Age does slow ultramarathon runners down, but less than a simple comparison suggests, and experience appears to matter more. Younger runners are faster when they finish, but they are also the most likely to drop out.
+
+Some limits to keep in mind:
+
+- "Experience" counts races in this dataset only, and includes races that happened *after* the one in each row.
+- Runners are matched by name, gender, and nationality, which is not a perfect identifier.
+- People who race many times are probably not a random group. They may be the runners who were already good at this, so experience and talent are mixed together.
+
+In terms of the tidyverse, `left_join()` made the analysis possible by bringing race distance into the results table, and `case_when()` turned raw numbers into the groups that the comparison is built on.
