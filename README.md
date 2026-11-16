@@ -57,7 +57,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Aniss S
-Initial Description and Link: _TBD_
+Initial Description and Link: lubridate date handling (`make_date()`, `ymd()`, `wday()`, `floor_date()`, `days_in_month()`, `weeks()`, `%m+%`) on FiveThirtyEight's daily US births data, ending with the Friday the 13th effect — [aniss_s_lubridate_births.qmd](vignettes/aniss_s_lubridate_births.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -67,7 +67,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Bikash B
-Initial Description and Link: _TBD_
+Initial Description and Link: Initial Description and Link: Explores income, poverty, and commuting patterns across New York City using dplyr and ggplot2 — [bikash_b_income_poverty_NYC.qmd](vignettes/bikash_b_income_poverty_NYC.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -117,7 +117,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Ellie W
-Initial Description and Link: _TBD_
+Initial Description and Link: Exploring Electricity Mix Data with Tidyverse [ellie_w_tidyr_energy_mix.qmd](vignettes/ellie_w_tidyr_energy_mix.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -137,7 +137,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Jocelyn S
-Initial Description and Link: _TBD_
+Initial Description and Link: Data Science: Into the Tidyverse. An exploration of the tidyverse using Marvel Comic Data. [Jocelyn_S_IntoTheTidyverse.qmd](vignettes/Jocelyn_S_IntoTheTidyverse.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -152,7 +152,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Kailot H
-Initial Description and Link: _TBD_
+Initial Description and Link: `case_when()`, `summarize()`, `fct_reorder()`, and `ggplot2` on NY Knicks shot-chart data via `hoopR` — [kailot_h_knicks_shots.qmd](vignettes/kailot_h_knicks_shots.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -170,8 +170,11 @@ Revision/Addition Description and Link: _TBD_
 Initial Description and Link: `fct_lump_n()`, `fct_collapse()`, and other forcats functions on the NYC Dog Licensing dataset — [kevin_v_forcats_nyc_dogs.qmd](vignettes/kevin_v_forcats_nyc_dogs.qmd)
 
 Revision/Addition Description and Link: _TBD_
+
 ### Lakeranie B
-Initial Description and Link: _TBD_
+Initial Description and Link: This project explores flight delays at JFK, LaGuardia, and Newark airports during 2013 using the nycflights13 dataset. I used Tidyverse packages such as dplyr and ggplot2 to clean, organize, and analyze flight records. The analysis compares departure delay rates by month and airline, using summary tables and visualizations to identify patterns.
+
+[View My NYC Flight Delays Vignette](vignettes/Lakeranie_b_flight_delays.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
@@ -201,7 +204,8 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Muhammad I
-Initial Description and Link: _TBD_
+Initial Description and Link: This vignette demonstrates how to use the **Tidyverse** to import, inspect, transform, summarize, and visualize an observational dataset. The dataset contains information about online news articles and the number of times each article was shared.
+(Muhammad_I_online_news_popularity_analysis_using_tidyverse.qmd)[vignettes/Muhammad_I_online_news_popularity_analysis_using_tidyverse.qmd]
 
 Revision/Addition Description and Link: _TBD_
 

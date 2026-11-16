@@ -1,0 +1,167 @@
+---
+title: "When Are NYC Flights Most Likely to Be Delayed?"
+subtitle: "A Tidyverse vignette using dplyr and ggplot2"
+author: "Lakeranie Boodram"
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  warning: false
+  message: false
+---
+
+## Introduction
+
+Flight delays are a common issue for travelers and can vary depending on the airline and time of year. In this project, I will use the `nycflights13` dataset to examine flight delays at three major New York City airports: JFK, LaGuardia, and Newark, during 2013. Using Tidyverse packages such as `dplyr` and `ggplot2`, I will clean, organize, and analyze the data to determine which months and airlines had the highest percentage of delayed departures. I will also create visualizations to compare the results and identify patterns in the data. The purpose of this project is to demonstrate how Tidyverse functions can be used to explore and better understand real-world flight data.
+
+## Step 1: Load packages and explore the dataset
+
+The `dplyr` package helps manipulate data, while `ggplot2` creates charts. The `nycflights13` package supplies the flight records and airline names. Install the packages once from the R console if necessary:
+
+```r
+install.packages(c("dplyr", "ggplot2", "nycflights13"))
+```
+
+Then load the packages:
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(nycflights13)
+```
+
+Use `glimpse()` to inspect the columns, and `head()` to view the first few records:
+
+```{r}
+glimpse(flights)
+head(flights)
+```
+
+The variables needed here are `month`, `carrier`, `dep_delay`, and `origin`. The variable `dep_delay` records departure delays in minutes; negative values indicate early departures.
+
+## Step 2: Clean and prepare the data with `filter()` and `mutate()`
+
+Some flights have no recorded departure delay, so I remove those rows using `filter(!is.na(dep_delay))`. This means the following delay percentages are calculated **only among flights with known departure-delay values**; cancelled flights and other missing values are not counted as on-time or delayed.
+
+Next, `mutate()` creates a new logical variable named `delayed_15`, which is `TRUE` when a flight left **more than 15 minutes late**. I also create a readable month label for the charts.
+
+```{r}
+flights_clean <- flights %>%
+  filter(!is.na(dep_delay)) %>%
+  mutate(
+    delayed_15 = dep_delay > 15,
+    month_name = factor(month.abb[month], levels = month.abb)
+  )
+
+flights_clean %>%
+  select(month, month_name, carrier, origin, dep_delay, delayed_15) %>%
+  head(8)
+```
+
+## Step 3: Calculate delay rates by month with `group_by()` and `summarise()`
+
+`group_by(month_name)` divides the records into months. `summarise()` then counts flights, calculates the average departure delay, and finds the percentage delayed by more than 15 minutes. Because `delayed_15` is logical, `mean(delayed_15)` gives the proportion of `TRUE` values. Multiplying by 100 expresses it as a percentage.
+
+```{r}
+monthly_delays <- flights_clean %>%
+  group_by(month_name) %>%
+  summarise(
+    flights_count = n(),
+    avg_delay_minutes = mean(dep_delay),
+    percent_delayed = mean(delayed_15) * 100,
+    .groups = "drop"
+  )
+
+monthly_delays
+```
+
+## Step 4: Visualize monthly delay rates with `ggplot2`
+
+`ggplot()` establishes the variables used in a chart, while `geom_col()` draws bars whose heights represent the calculated percentages. This chart makes it easier to compare all 12 months.
+
+```{r}
+ggplot(monthly_delays, aes(x = month_name, y = percent_delayed)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Share of NYC Flights Departing More Than 15 Minutes Late",
+    subtitle = "JFK, LaGuardia, and Newark departures in 2013",
+    x = "Month",
+    y = "Flights delayed (%)",
+    caption = "Source: nycflights13; excludes missing departure delays"
+  ) +
+  theme_minimal()
+```
+
+## Step 5: Compare airlines using `left_join()` and `arrange()`
+
+The `carrier` field contains two-letter airline codes. I use `left_join()` to add readable airline names from the `airlines` table. Then I calculate each airline's delay rate and use `arrange(desc(percent_delayed))` to sort from the highest to lowest percentage.
+
+```{r}
+airline_delays <- flights_clean %>%
+  group_by(carrier) %>%
+  summarise(
+    flights_count = n(),
+    percent_delayed = mean(delayed_15) * 100,
+    avg_delay_minutes = mean(dep_delay),
+    .groups = "drop"
+  ) %>%
+  left_join(airlines, by = "carrier") %>%
+  arrange(desc(percent_delayed))
+
+airline_delays %>%
+  select(name, flights_count, percent_delayed, avg_delay_minutes)
+```
+
+Keep in mind that airlines operate different routes and schedules, so a higher historical delay rate does not necessarily mean one airline is worse in all circumstances.
+
+## Step 6: Visualize airline delay rates
+
+Here I use `reorder()` to arrange airlines by delay percentage in the chart, and `coord_flip()` to make the airline names easier to read. Each bar represents the percentage of that airline's flights that departed more than 15 minutes late, among records with known departure delays.
+
+```{r}
+ggplot(airline_delays,
+       aes(x = reorder(name, percent_delayed), y = percent_delayed)) +
+  geom_col(fill = "darkorange") +
+  coord_flip() +
+  labs(
+    title = "Departure Delay Rates by Airline",
+    subtitle = "NYC departures in 2013; delay means more than 15 minutes",
+    x = "Airline",
+    y = "Flights delayed (%)",
+    caption = "Source: nycflights13; excludes missing departure delays"
+  ) +
+  theme_minimal()
+```
+
+## Step 7: Identify the month with the highest delay rate
+
+Finally, `slice_max()` retrieves the month with the largest delayed-flight percentage. The `with_ties = TRUE` option keeps all months if they happen to have exactly the same highest rate.
+
+```{r}
+monthly_delays %>%
+  slice_max(order_by = percent_delayed, n = 1, with_ties = TRUE)
+```
+
+## Conclusion
+
+This analysis helped me better understand how flight delays varied by month and airline at three major New York City airports in 2013. Based on the results, July had the highest percentage of delayed departures at 29.6%, while September had the lowest at 13.9%. When comparing airlines, ExpressJet had the highest percentage of delayed flights at 30.5%, while Hawaiian Airlines had the lowest at 7.02%. However, these differences may be influenced by factors such as weather, flight schedules, and the number of flights operated by each airline.
+
+Throughout this project, I used Tidyverse functions such as `filter()`, `mutate()`, `group_by()`, `summarise()`, and `arrange()` to clean, organize, and analyze the data. I also used `ggplot2` to create visualizations that made it easier to compare the results. Overall, this project demonstrated how Tidyverse can be used to identify patterns in large datasets and turn raw information into meaningful insights.
+
+## Data Sources and References
+
+1. **nycflights13 R Package.** Contains historical flight information for flights departing JFK, LaGuardia, and Newark airports in 2013.  
+   https://nycflights13.tidyverse.org/
+
+2. **Bureau of Transportation Statistics (BTS).** Provides historical airline on-time performance data, including departure and arrival delays.  
+   https://www.transtats.bts.gov/ONTIME/
+
+3. **Bureau of Transportation Statistics — Airline On-Time Tables.** Provides historical airline performance statistics and on-time rankings.  
+   https://www.bts.gov/topics/airline-time-tables
+
+4. **National Oceanic and Atmospheric Administration (NOAA).** Provides historical weather data that could be used to investigate how weather conditions relate to flight delays.  
+   https://www.ncei.noaa.gov/cdo-web/
+
+5. **CRAN — nycflights13 Documentation.** Provides package information and documentation for the flight dataset used in this analysis.  
+   https://cran.r-project.org/web/packages/nycflights13/index.html

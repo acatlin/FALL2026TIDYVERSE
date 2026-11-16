@@ -1,0 +1,619 @@
+---
+title: "Data-607--TidyVerse---Exploring Income, Poverty, and Commuting Patterns Across New York City"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    theme: cosmo
+---
+
+<div class="report-author">Bikash Bhowmik</div>
+<div class="report-date">14-Nov-2026</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  comment = "#>",
+  fig.width = 9,
+  fig.height = 5,
+  dpi = 120
+)
+```
+
+# Introduction
+
+New York City is made up of neighborhoods with different population sizes, income levels, commuting patterns, and economic conditions. Census-tract data provide a useful way to explore how these characteristics vary across the five boroughs.
+
+This vignette demonstrates how to use the **Tidyverse** to import, inspect, clean, transform, summarize, and visualize a real-world dataset. The analysis focuses on three questions:
+
+1. How does reported household income vary across the five boroughs?
+2. Is there an association between tract-level poverty and income?
+3. How do average commute times differ across boroughs?
+
+The goal is to demonstrate reproducible data-wrangling and visualization techniques. The analysis is descriptive: it does not establish that one characteristic causes another.
+
+# Dataset and source
+
+The dataset contains demographic, economic, employment, and commuting information for New York City census tracts. It was originally distributed through Kaggle as **New York City Census Data** and is accessed here from a public GitHub copy of the CSV file.
+
+- Dataset page: <https://www.kaggle.com/datasets/muonneutrino/new-york-city-census-data>
+- CSV used in this vignette: <https://raw.githubusercontent.com/BIKASHBHOWMIK15/Data-607/main/Tidyverse/nyc_census_tracts.csv>
+
+The source file contains census-tract identifiers, county and borough names, total population, income measures, poverty measures, employment information, and commuting characteristics. The original example reports 2,167 rows and 36 columns. The code below checks the dimensions again when the file is loaded.
+
+**Unit of analysis:** one row represents a census tract. Therefore, borough averages in this vignette are averages across tracts, not population-weighted estimates for all borough residents.
+
+# Learning objectives
+
+After completing this vignette, a reader should be able to:
+
+- import a CSV file with `readr::read_csv()`;
+- inspect a data frame with `glimpse()` and `summarise()`;
+- identify missing values with `is.na()` and `across()`;
+- select useful columns with `select()`;
+- remove incomplete or invalid records with `filter()` and `drop_na()`;
+- create derived variables with `mutate()` and `case_when()`;
+- summarize observations by group with `group_by()` and `summarise()`;
+- sort results with `arrange()` and `slice_*()`; and
+- create plots with `ggplot2`.
+
+# Install and load the packages
+
+The `tidyverse` package loads a collection of packages designed to work together for data science. This vignette mainly uses **readr**, **dplyr**, **tidyr**, **ggplot2**, and **forcats**.
+
+
+```{r packages}
+
+library(tidyverse)
+```
+
+#  Import the dataset
+
+`read_csv()` reads a comma-separated file and returns a tibble. A tibble is a modern form of data frame that prints useful information without displaying every row and column.
+
+```{r import-data}
+data_url <- paste0("https://raw.githubusercontent.com/BIKASHBHOWMIK15/Data-607/main/Tidyverse/nyc_census_tracts.csv")
+
+nyc_raw <- read_csv(data_url, show_col_types = FALSE)
+
+# Check the number of rows and columns.
+dim(nyc_raw)
+
+# Display the column names.
+names(nyc_raw)
+
+# Inspect variable types and example values.
+glimpse(nyc_raw)
+```
+
+The original dataset contains 2,167 census-tract records and 36 variables. The `dim()` and `glimpse()` commands let us verify the structure rather than assume that the downloaded file has not changed.
+
+#  Examine missing values
+
+Missing data can affect summaries and plots. Before cleaning the dataset, it is useful to determine which columns contain missing values.
+
+The code below combines `summarise()`, `across()`, and `pivot_longer()`:
+
+- `summarise()` creates a one-row summary;
+- `across()` applies the same calculation to every column;
+- `is.na()` identifies missing values; and
+- `pivot_longer()` changes the summary from a wide layout to a tidy two-column layout.
+
+```{r missing-values}
+missing_summary <- nyc_raw %>%
+  summarise(
+    across(
+      everything(),
+      ~ sum(is.na(.x))
+    )
+  ) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "missing_count"
+  ) %>%
+  mutate(
+    missing_percent = round(
+      100 * missing_count / nrow(nyc_raw),
+      2
+    )
+  ) %>%
+  filter(missing_count > 0) %>%
+  arrange(desc(missing_count))
+
+missing_summary
+```
+
+This table reports the number and percentage of missing values for each affected variable. It helps identify which fields need attention before analysis.
+
+#  Select and clean the variables
+
+The analysis does not require all 36 columns. `select()` keeps only the variables needed for the research questions. `filter()` removes records without the borough, income, or population information required for the main analysis.
+
+The income and population fields are also checked for positive values. The selected poverty and commute fields are retained even if they contain missing values; they will be handled when the relevant analysis is performed.
+
+```{r clean-data}
+nyc <- nyc_raw %>%
+  select(
+    CensusTract,
+    County,
+    Borough,
+    TotalPop,
+    Income,
+    IncomePerCap,
+    Poverty,
+    ChildPoverty,
+    MeanCommute,
+    Transit,
+    Walk,
+    Drive,
+    Unemployment
+  ) %>%
+  filter(
+    !is.na(Borough),
+    !is.na(Income),
+    !is.na(TotalPop),
+    Income > 0,
+    TotalPop > 0
+  ) %>%
+  mutate(
+    Borough = as.factor(Borough)
+  )
+
+# Confirm the cleaned data structure.
+glimpse(nyc)
+
+# Count the records retained for each borough.
+nyc %>%
+  count(Borough, name = "tract_count") %>%
+  arrange(desc(tract_count))
+```
+
+This cleaning step creates an analysis dataset containing records with the minimum information needed for the income and population comparisons. It does not remove a tract merely because a secondary variable, such as commute time, is missing.
+
+#  Create a poverty category with mutate() and case_when()
+
+A numeric poverty percentage can be easier to interpret when grouped into meaningful categories. `mutate()` creates a new column, while `case_when()` assigns a label based on conditions.
+
+The categories below are descriptive groupings selected for this example; they are not official government classifications.
+
+```{r create-poverty-category}
+nyc <- nyc %>%
+  mutate(
+    PovertyGroup = case_when(
+      is.na(Poverty) ~ "Not reported",
+      Poverty < 10 ~ "Below 10%",
+      Poverty < 20 ~ "10% to below 20%",
+      TRUE ~ "20% or higher"
+    ),
+    PovertyGroup = factor(
+      PovertyGroup,
+      levels = c(
+        "Below 10%",
+        "10% to below 20%",
+        "20% or higher",
+        "Not reported"
+      )
+    )
+  )
+
+nyc %>%
+  count(PovertyGroup, name = "tract_count") %>%
+  arrange(PovertyGroup)
+```
+
+The new `PovertyGroup` variable can be used to compare income across broad poverty categories. Keeping missing poverty values as `"Not reported"` also makes the missing-data category visible rather than silently treating it as zero.
+
+#  Summarize income and other characteristics by borough
+
+`group_by()` divides the data into borough groups. `summarise()` then calculates statistics within each group. The `na.rm = TRUE` argument tells the summary functions to ignore missing values for the particular variable being summarized.
+
+The income statistics below describe the distribution of census-tract income values within each borough. They should not be interpreted as population-weighted borough income estimates.
+
+```{r borough-summary}
+borough_summary <- nyc %>%
+  group_by(Borough) %>%
+  summarise(
+    census_tracts = n(),
+    mean_tract_income = mean(Income, na.rm = TRUE),
+    median_tract_income = median(Income, na.rm = TRUE),
+    mean_population = mean(TotalPop, na.rm = TRUE),
+    mean_poverty_percent = mean(Poverty, na.rm = TRUE),
+    mean_commute_minutes = mean(MeanCommute, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(median_tract_income))
+
+borough_summary
+```
+
+The resulting table makes it possible to compare the boroughs using the same set of summary measures. The median is included because it is less sensitive than the mean to unusually high or low tract-level income values.
+
+#  Identify the highest- and lowest-income census tracts
+
+`arrange()` sorts rows, and `slice_head()` and `slice_tail()` select records from the sorted result. The following code identifies a small number of census tracts at each end of the income distribution.
+
+```{r income-extremes}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+
+highest_income_tracts <- nyc %>%
+  arrange(desc(Income)) %>%
+  select(
+    CensusTract,
+    County,
+    Borough,
+    TotalPop,
+    Income,
+    Poverty
+  ) %>%
+  slice_head(n = 10)
+
+lowest_income_tracts <- nyc %>%
+  arrange(Income) %>%
+  select(
+    CensusTract,
+    County,
+    Borough,
+    TotalPop,
+    Income,
+    Poverty
+  ) %>%
+  slice_head(n = 10)
+
+highest_income_tracts %>%
+  mutate(
+    Income = scales::dollar(Income),
+    Poverty = paste0(Poverty, "%")
+  ) %>%
+  kable(
+    caption = "Top 10 NYC Census Tracts by Median Household Income",
+    col.names = c(
+      "Census Tract",
+      "County",
+      "Borough",
+      "Population",
+      "Median Household Income",
+      "Poverty Rate"
+    ),
+    align = c("l", "l", "l", "r", "r", "r"),
+    format.args = list(big.mark = ",")
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  )
+
+lowest_income_tracts %>%
+  mutate(
+    Income = scales::dollar(Income),
+    Poverty = paste0(Poverty, "%")
+  ) %>%
+  kable(
+    caption = "Bottom 10 NYC Census Tracts by Median Household Income",
+    col.names = c(
+      "Census Tract",
+      "County",
+      "Borough",
+      "Population",
+      "Median Household Income",
+      "Poverty Rate"
+    ),
+    align = c("l", "l", "l", "r", "r", "r"),
+    format.args = list(big.mark = ",")
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  )
+
+```
+
+These results show the range of tract-level income values in the cleaned dataset. They are useful for checking whether a small number of unusually high or low observations may influence the overall distribution.
+
+#  Visualize the income distribution
+
+A histogram shows how frequently income values occur across the census tracts. The vertical line marks the median tract-level income in the cleaned dataset.
+
+`ggplot()` defines the data and aesthetic mapping, while `geom_histogram()` draws the bars. `geom_vline()` adds the median reference line.
+
+```{r income-histogram}
+overall_median_income <- median(nyc$Income, na.rm = TRUE)
+
+ggplot(nyc, aes(x = Income)) +
+  geom_histogram(
+    bins = 40,
+    fill = "steelblue",
+    color = "white"
+  ) +
+  geom_vline(
+    xintercept = overall_median_income,
+    color = "red",
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Distribution of Census-Tract Income in New York City",
+    subtitle = "The dashed line represents the median across included tracts",
+    x = "Reported income (USD)",
+    y = "Number of census tracts",
+    caption = "Source: New York City Census Data; see dataset links above."
+  ) +
+  theme_minimal()
+```
+
+The histogram helps show whether tract-level income values are concentrated in a particular range or whether the distribution has a long tail. The median line provides a reference point for the distribution.
+
+#  Compare income across the five boroughs
+
+A boxplot displays the median, interquartile range, and potential outlying values for each borough. It is useful for comparing the spread of tract-level income values, rather than comparing only one average.
+
+`fct_reorder()` orders the borough labels by their median income, making the chart easier to read.
+
+```{r income-by-borough}
+nyc %>%
+  mutate(
+    Borough = fct_reorder(Borough, Income, .fun = median, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(x = Borough, y = Income)) +
+  geom_boxplot(
+    fill = "skyblue",
+    color = "gray25",
+    outlier.alpha = 0.35
+  ) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::label_dollar()) +
+  labs(
+    title = "Census-Tract Income Distribution by Borough",
+    x = "Borough",
+    y = "Reported income (USD)",
+    caption = "Each observation represents a census tract."
+  ) +
+  theme_minimal()
+```
+
+The boxplots show both differences in typical income and differences in the amount of variation within each borough. Overlapping boxes indicate that the borough distributions are not completely separated.
+
+#  Explore the relationship between poverty and income
+
+A scatterplot can help determine whether census tracts with higher poverty percentages tend to have lower reported income. Each point represents one tract.
+
+`geom_smooth(method = "lm")` adds a fitted linear trend line. This line summarizes an association in the observed data; it does not establish a causal relationship.
+
+```{r poverty-income}
+poverty_income_data <- nyc %>%
+  drop_na(Poverty, Income)
+
+ggplot(
+  poverty_income_data,
+  aes(x = Poverty, y = Income)
+) +
+  geom_point(
+    alpha = 0.45,
+    color = "steelblue"
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = TRUE,
+    color = "darkred"
+  ) +
+  scale_y_continuous(labels = scales::label_dollar()) +
+  labs(
+    title = "Census-Tract Poverty and Income",
+    subtitle = "Each point represents a tract with both measures available",
+    x = "Population below poverty level (%)",
+    y = "Reported income (USD)",
+    caption = "The fitted line describes association, not causation."
+  ) +
+  theme_minimal()
+```
+
+The direction and spread of the points provide a visual indication of whether poverty and income are associated. The width of the scatter also reminds us that poverty alone does not explain all differences in tract-level income.
+
+#  Compare average commute time by borough
+
+The dataset also contains `MeanCommute`, which records mean commute time in minutes. This section uses `drop_na()` to include only tracts with a reported commute-time value.
+
+```{r commute-summary}
+commute_summary <- nyc %>%
+  drop_na(MeanCommute) %>%
+  group_by(Borough) %>%
+  summarise(
+    mean_commute_minutes = mean(MeanCommute),
+    median_commute_minutes = median(MeanCommute),
+    tracts_with_commute_data = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(mean_commute_minutes))
+
+commute_summary %>%
+  mutate(
+    mean_commute_minutes = paste0(
+      round(mean_commute_minutes, 1), " minutes"
+    ),
+    median_commute_minutes = paste0(
+      round(median_commute_minutes, 1), " minutes"
+    ),
+    tracts_with_commute_data = scales::comma(
+      tracts_with_commute_data
+    )
+  ) %>%
+  kable(
+    caption = "Average and Median Commute Time by NYC Borough",
+    col.names = c(
+      "Borough",
+      "Mean Commute Time",
+      "Median Commute Time",
+      "Number of Census Tracts"
+    ),
+    align = c("l", "r", "r", "r")
+  ) %>%
+  kable_styling(
+    bootstrap_options = c(
+      "striped",
+      "hover",
+      "condensed",
+      "responsive"
+    ),
+    full_width = FALSE,
+    position = "center"
+  )
+```
+
+The next plot compares the distribution of tract-level commute times across boroughs.
+
+```{r commute-boxplot}
+nyc %>%
+  drop_na(MeanCommute) %>%
+  mutate(
+    Borough = fct_reorder(
+      Borough,
+      MeanCommute,
+      .fun = median
+    )
+  ) %>%
+  ggplot(aes(x = Borough, y = MeanCommute)) +
+  geom_boxplot(
+    fill = "tan",
+    color = "gray25"
+  ) +
+  coord_flip() +
+  labs(
+    title = "Mean Commute Time by Borough",
+    x = "Borough",
+    y = "Mean commute time (minutes)",
+    caption = "Each observation represents a census tract with commute data."
+  ) +
+  theme_minimal()
+```
+
+The chart can reveal differences in typical commute time and variation across tracts within each borough. It does not identify the transportation mode or explain why commute times differ.
+
+#  Reshape borough summaries with pivot_longer()
+
+The `pivot_longer()` function converts selected summary columns into a long format. This is useful when several measures need to be displayed using the same plotting structure.
+
+The measures in this example have different units, so the plot uses separate panels with independent y-axis scales.
+
+```{r pivot-summary}
+borough_summary %>%
+  select(
+    Borough,
+    median_tract_income,
+    mean_poverty_percent,
+    mean_commute_minutes
+  ) %>%
+  mutate(
+    median_tract_income = scales::dollar(median_tract_income),
+    mean_poverty_percent = paste0(
+      round(mean_poverty_percent, 1), "%"
+    ),
+    mean_commute_minutes = paste0(
+      round(mean_commute_minutes, 1), " minutes"
+    )
+  ) %>%
+  kable(
+    caption = "Comparison of Income, Poverty, and Commuting Across NYC Boroughs",
+    col.names = c(
+      "Borough",
+      "Median Household Income",
+      "Average Poverty Rate",
+      "Average Commute Time"
+    ),
+    align = c("l", "r", "r", "r")
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  )
+
+borough_summary_long <- borough_summary %>%
+  select(
+    Borough,
+    median_tract_income,
+    mean_poverty_percent,
+    mean_commute_minutes
+  ) %>%
+  pivot_longer(
+    cols = -Borough,
+    names_to = "measure",
+    values_to = "value"
+  ) %>%
+  mutate(
+    measure = recode(
+      measure,
+      median_tract_income = "Median Household Income ($)",
+      mean_poverty_percent = "Average Poverty Rate (%)",
+      mean_commute_minutes = "Average Commute Time (Minutes)"
+    )
+  )
+
+ggplot(
+  borough_summary_long,
+  aes(
+    x = fct_reorder(Borough, value),
+    y = value
+  )
+) +
+  geom_col(fill = "cadetblue") +
+  coord_flip() +
+  facet_wrap(
+    ~ measure,
+    scales = "free_x"
+  ) +
+  labs(
+    title = "Selected Census-Tract Measures by Borough",
+    subtitle = "Comparing income, poverty, and commuting patterns across NYC",
+    x = "Borough",
+    y = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 15),
+    plot.subtitle = element_text(size = 11),
+    strip.text = element_text(face = "bold", size = 11),
+    axis.text = element_text(size = 10)
+  )
+
+```
+
+This example demonstrates how `pivot_longer()` makes a wide summary table suitable for faceted plotting. Because income, poverty, and commute time use different units, each panel has its own scale and should be interpreted separately.
+
+#  Key findings and interpretation
+
+Use the summary tables and plots generated above to describe the patterns in the downloaded data. The following points are intended as an interpretation guide; the actual values should be read from the knitted output.
+
+- **Income distribution:** The histogram shows the spread of reported income across the census tracts included in the analysis. Compare the median reference line with the shape of the distribution.
+- **Differences by borough:** The borough summary and boxplot show how the median and spread of tract-level income vary across the five boroughs.
+- **Poverty and income:** The scatterplot and fitted trend line help assess whether higher tract-level poverty is associated with lower reported income in this dataset.
+- **Commute time:** The commute-time table and boxplot show how average tract-level commute times vary across boroughs.
+- **Variation within boroughs:** The boxplots show that a borough-level summary does not capture every difference among its census tracts.
+
+These findings are descriptive and should not be interpreted as causal. The dataset represents census tracts, not individual households, and the borough-level summaries are not population-weighted estimates. Other variables and data from different years could produce different patterns.
+
+#  Conclusion
+
+This vignette demonstrated a practical Tidyverse workflow using New York City census-tract data. The analysis imported a CSV file, inspected its structure, measured missingness, selected relevant columns, created a poverty category, grouped observations by borough, calculated descriptive summaries, and created visualizations.
+
+The examples highlighted several useful functions:
+
+- **readr:** `read_csv()`
+- **dplyr:** `select()`, `filter()`, `mutate()`, `case_when()`, `group_by()`, `summarise()`, `arrange()`, `count()`, `drop_na()`, and `slice_head()`
+- **tidyr:** `pivot_longer()`
+- **forcats:** `fct_reorder()`
+- **ggplot2:** `ggplot()`, `aes()`, `geom_histogram()`, `geom_vline()`, `geom_boxplot()`, `geom_point()`, `geom_smooth()`, `geom_col()`, `facet_wrap()`, and `coord_flip()`
+
+Together, these functions make it possible to create a readable and reproducible data-analysis workflow. The same approach can be adapted to other public datasets and research questions.
+
+# References
+
+1. Kaggle. *New York City Census Data*. https://www.kaggle.com/datasets/muonneutrino/new-york-city-census-data
+2. Public CSV copy used for this vignette. https://raw.githubusercontent.com/BIKASHBHOWMIK15/Data-607/main/Tidyverse/nyc_census_tracts.csv
+3. The Tidyverse. *Learn the Tidyverse*. https://www.tidyverse.org/learn/

@@ -1,0 +1,95 @@
+---
+title: "Tidyverse Vignette: "
+author: "Jocelyn Slater"
+date:   today
+format:
+  html:
+    toc: true
+    code-fold: true
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+editor: visual
+---
+
+```{r load-packages, message=FALSE, echo=FALSE}
+library(tidyverse)
+```
+
+# Data Science: Into the Tidyverse
+
+![](https://imageio.forbes.com/blogs-images/insertcoin/files/2018/12/spider4.jpg?format=jpg&height=600&width=1200&fit=bounds)
+
+This data set contains information on all of the Marvel Comics. Much like Miles Morales cleans up the NYC streets, transforms into Spiderman, and assesses villains, we can use tidyverse functions to clean, transform, and assess the data. The tidyverse contains 8 libraries which are foundational to data science work in R:
+
+- ggplot2: Data visualization
+- dplyr: Data manipulation
+- tidyr: Neaten messy data
+- readr: Read in data
+- purrr: Functional programming
+- tibble: Data frame
+- stringr: String manipulation
+- forcats: Factor work
+
+# Load Data
+```{r load-data}
+url <- "https://raw.githubusercontent.com/jocslater-code/DATA607/refs/heads/main/tidyverse/Marvel_Comics.csv"
+comics_raw <- read_csv(url)  
+glimpse(comics_raw)
+```
+
+# Data Cleaning
+```{r data-cleaning}
+# Replace "Free" with 0 in price
+comics_clean <- comics_raw %>%
+  mutate(
+    Price_numeric = case_when(
+      tolower(Price) == "free" ~ 0,
+      tolower(Price) == "none" ~ 0,
+      TRUE ~ as.numeric(gsub("[$,]", "", Price))
+      )
+  )
+# Extract year
+comics_clean <- comics_clean %>%
+  mutate(
+    parsed_date = mdy(publish_date),
+    pub_year = year(parsed_date)
+  ) 
+# Remove year one because that doesn't make sense
+comics_clean <- comics_clean %>%
+  filter(between(pub_year, 1939, 2026))
+```
+
+# Analysis
+```{r basic-analysis}
+# Create a price summary over time
+price_summary <- comics_clean %>%
+  filter(!is.na(pub_year), !is.na(Price_numeric)) %>%
+  group_by(pub_year) %>%
+  summarize(
+    mean_price = mean(Price_numeric, na.rm = TRUE),
+    median_price = median(Price_numeric, na.rm = TRUE),
+    issue_count = n(),
+    .groups = "drop"
+  )
+```
+
+# Visualize Results
+```{r visualize}
+# Plot the price summary
+ggplot(price_summary, aes(x = pub_year, y = mean_price)) +
+  geom_line(color = "#E23636", linewidth = 1.2) +
+  geom_point(color = "#202020", size = 2) +
+  labs(
+    title = "Average Comic Book Price Over Time",
+    x = "Publication Year",
+    y = "Average Price ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
+
+# Discussion and Next Steps
