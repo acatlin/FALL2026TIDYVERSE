@@ -250,7 +250,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Tenzin T
-Initial Description and Link: _TBD_
+Initial Description and Link:This vignette demonstrates the implementation of Tidyverse packages to explore MTA Subway Hourly Ridership data for December 2024.[Tenzin_T_MTA_subway_ridership.qmd](vignettes/Tenzin_T_MTA_subway_ridership.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
