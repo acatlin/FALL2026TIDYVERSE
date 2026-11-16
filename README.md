@@ -245,7 +245,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Supriya P
-Initial Description and Link: _TBD_
+Initial Description and Link: `rename_with()` and `across()` from dplyr on FiveThirtyEight's Bad Drivers data, comparing driver behavior with car insurance premiums. [supriya_p_across_bad_drivers.qmd](vignettes/supriya_p_across_bad_drivers.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
