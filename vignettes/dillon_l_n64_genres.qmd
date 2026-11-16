@@ -6,11 +6,11 @@ format: html
 
 ## What are we exploring?
 
-Which genres have the most Nintendo 64 games in this dataset? This example shows how to use three `dplyr` functions: `filter()` to select rows, `count()` to count them, and `arrange()` to order the results.
+Which genres have the most Nintendo 64 games in this dataset? I chose the N64 because I wanted to explore video games while practicing Tidyverse functions. This example shows how to use three `dplyr` functions: `filter()` to select rows, `count()` to count them, and `arrange()` to order the results.
 
 ## The data
 
-The [Video Games Sales dataset](https://doi.org/10.5281/zenodo.5898311) contains game-platform records for many consoles. It includes each game's name, platform, genre, publisher, and estimated sales. The dataset creator describes it as a historical scrape of VGChartz, focused on games with sales above 100,000 copies. It is not a complete list of all video games or all N64 releases, so the results below describe only games in this dataset.
+The [Video Games Sales dataset](https://doi.org/10.5281/zenodo.5898311) contains game-platform records for many consoles. It includes each game's name, platform, genre, publisher, and estimated sales. The dataset creator describes it as a historical scrape of VGChartz. The source description says it covers games with sales above 100,000 copies, but the CSV also contains entries with lower reported sales, so that threshold is not a reliable rule for every row. The dataset is not a complete list of all video games or N64 releases, so the results below describe only games in this dataset.
 
 The code reads the CSV from its public source. An internet connection is needed to run the document.
 
@@ -24,7 +24,7 @@ games <- read_csv(
 )
 ```
 
-Let's look at a few rows and the columns we will use. `Platform` identifies the console and `Genre` describes the type of game.
+Let's look at a few rows and the columns we will use. `Platform` identifies the console and `Genre` describes the type of game. The pipe (`%>%`) passes the data on its left to the next function. `select()` chooses columns, while `head(8)` displays the first eight rows.
 
 ```{r}
 games %>%
@@ -45,7 +45,16 @@ n64_games %>%
   head(8)
 ```
 
-We saved the result as `n64_games`. The original `games` dataset still contains the other platforms. The pipe (`%>%`) passes the result on the left to the next function on the right.
+We saved the result as `n64_games`. The original `games` dataset still contains the other platforms. We can use `nrow()` to see how filtering changed the number of records.
+
+```{r}
+data.frame(
+  dataset = c("All platforms", "Nintendo 64"),
+  number_of_rows = c(nrow(games), nrow(n64_games))
+)
+```
+
+Each row represents a game on a particular platform. The filtered table keeps only records labeled `N64`.
 
 ## 2. Count games in each genre with `count()`
 
@@ -71,14 +80,14 @@ genre_counts <- genre_counts %>%
 genre_counts
 ```
 
-The first row now shows the genre with the most N64 records in this dataset. If two genres have the same count, their order does not mean one has more games than the other.
+The first row now shows the genre with the most N64 records in this dataset. In the source version examined for this tutorial, Sports is first with 80 records, followed by Racing with 57. These are counts of records, not units sold or a complete count of all games released. If two genres have the same count, their order does not mean one has more games than the other.
 
 ## Optional: visualize the counts
 
-A bar chart can make the counts easier to compare. `geom_col()` uses the counts we already calculated, and `coord_flip()` turns the chart sideways so genre names have room.
+A bar chart can make the counts easier to compare. `geom_col()` uses the counts we already calculated, and `coord_flip()` turns the chart sideways so genre names have room. We use `reorder()` inside the plot to order genres by count; sorting a table with `arrange()` alone does not change the order of categories on a ggplot axis.
 
 ```{r}
-ggplot(genre_counts, aes(x = Genre, y = number_of_games)) +
+ggplot(genre_counts, aes(x = reorder(Genre, number_of_games), y = number_of_games)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
   labs(
@@ -94,3 +103,5 @@ ggplot(genre_counts, aes(x = Genre, y = number_of_games)) +
 `filter()` selected N64 records, `count()` counted those records by genre, and `arrange()` put the largest counts first. The results are limited to the games included in this historical sales dataset; they should not be interpreted as a complete count of the N64 library.
 
 **Data source:** Smith, Gregory. *Video Games Sales* (2022), Zenodo. <https://doi.org/10.5281/zenodo.5898311>.
+
+**AI assistance:** OpenAI Codex (GPT-6), accessed November 14, 2026, assisted with drafting and reviewing this tutorial.
