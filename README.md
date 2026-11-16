@@ -96,7 +96,7 @@ Revision/Addition Description and Link: *TBD*
 
 ### Daanish R
 
-Initial Description and Link: Exploring College Majors
+Initial Description and Link: Exploring College Majors: [daanish_r_collegemajors.qmd](https://github.com/daanishrasheed/FALL2026TIDYVERSE/blob/main/vignettes/daanish_r_collegemajors.qmd){.uri}
 
 Revision/Addition Description and Link: *TBD*
 
