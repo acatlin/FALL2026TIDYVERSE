@@ -1,0 +1,96 @@
+---
+title: "Exploring Nintendo 64 Genres with Tidyverse"
+author: "Dillon Leeper"
+format: html
+---
+
+## What are we exploring?
+
+Which genres have the most Nintendo 64 games in this dataset? This example shows how to use three `dplyr` functions: `filter()` to select rows, `count()` to count them, and `arrange()` to order the results.
+
+## The data
+
+The [Video Games Sales dataset](https://doi.org/10.5281/zenodo.5898311) contains game-platform records for many consoles. It includes each game's name, platform, genre, publisher, and estimated sales. The dataset creator describes it as a historical scrape of VGChartz, focused on games with sales above 100,000 copies. It is not a complete list of all video games or all N64 releases, so the results below describe only games in this dataset.
+
+The code reads the CSV from its public source. An internet connection is needed to run the document.
+
+```{r}
+#| message: false
+library(tidyverse)
+
+games <- read_csv(
+  "https://zenodo.org/records/5898311/files/vgsales.csv?download=1",
+  show_col_types = FALSE
+)
+```
+
+Let's look at a few rows and the columns we will use. `Platform` identifies the console and `Genre` describes the type of game.
+
+```{r}
+games %>%
+  select(Name, Platform, Genre) %>%
+  head(8)
+```
+
+## 1. Keep only Nintendo 64 games with `filter()`
+
+The original dataset includes several platforms. `filter()` keeps the rows that meet a condition. Here, `Platform == "N64"` asks R to keep rows whose platform is N64. The two equals signs test whether the values match.
+
+```{r}
+n64_games <- games %>%
+  filter(Platform == "N64")
+
+n64_games %>%
+  select(Name, Platform, Genre) %>%
+  head(8)
+```
+
+We saved the result as `n64_games`. The original `games` dataset still contains the other platforms. The pipe (`%>%`) passes the result on the left to the next function on the right.
+
+## 2. Count games in each genre with `count()`
+
+`count(Genre)` groups the N64 rows by genre and counts the rows in each group. The `name` argument gives the count column a descriptive name.
+
+```{r}
+genre_counts <- n64_games %>%
+  count(Genre, name = "number_of_games")
+
+genre_counts
+```
+
+Each number is a count of records in this dataset, not a count of games sold. For example, 10 in the Racing row would mean 10 racing game records, not 10 copies sold.
+
+## 3. Sort the results with `arrange()`
+
+`arrange()` orders rows. Wrapping the count in `desc()` puts the largest counts first.
+
+```{r}
+genre_counts <- genre_counts %>%
+  arrange(desc(number_of_games))
+
+genre_counts
+```
+
+The first row now shows the genre with the most N64 records in this dataset. If two genres have the same count, their order does not mean one has more games than the other.
+
+## Optional: visualize the counts
+
+A bar chart can make the counts easier to compare. `geom_col()` uses the counts we already calculated, and `coord_flip()` turns the chart sideways so genre names have room.
+
+```{r}
+ggplot(genre_counts, aes(x = Genre, y = number_of_games)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Nintendo 64 Games by Genre",
+    subtitle = "Counts of records in the historical video game sales dataset",
+    x = "Genre",
+    y = "Number of game records"
+  )
+```
+
+## Takeaway
+
+`filter()` selected N64 records, `count()` counted those records by genre, and `arrange()` put the largest counts first. The results are limited to the games included in this historical sales dataset; they should not be interpreted as a complete count of the N64 library.
+
+**Data source:** Smith, Gregory. *Video Games Sales* (2022), Zenodo. <https://doi.org/10.5281/zenodo.5898311>.
