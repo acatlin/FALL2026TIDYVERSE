@@ -20,6 +20,8 @@ execute:
 
 This vignette demonstrates how to use core tidyverse functions (`dplyr::filter()`, `stringr::str_detect()`, `dplyr::mutate()`, `dplyr::case_when()`, `dplyr::summarize()`, `forcats::fct_reorder()`, and `ggplot2`) to wrangle and visualize New York Knicks shot-chart data loaded via `hoopR::load_nba_shots()`.
 
+**Extension (Kevin V):** The final section, "Extension: Points per Shot and the League Comparison," builds on this analysis. It converts field-goal percentage into points per shot, compares the Knicks with the rest of the NBA zone by zone, and breaks down the shot mix of the Knicks' top scorers using `tidyr::pivot_wider()` and `tidyr::pivot_longer()`.
+
 ## Data source
 
 For this assignment, data will be loaded from the `hoopR` package to access shot-chart data for the New York Knicks.
@@ -120,3 +122,180 @@ nyk_zone_summary |>
   ) +
   theme_minimal()
 ```
+
+
+## Extension: Points per Shot and the League Comparison
+
+*Added by Kevin V.*
+
+The chart above ranks zones by field-goal percentage. FG% treats every shot the same, but a made three is worth 3 points and a made two is worth 2. That means a 40% three-pointer produces more points than a 50% two-pointer. This section measures each zone by **points per shot**, compares the Knicks to the rest of the league, and looks at how the Knicks' main scorers choose their shots.
+
+### Points per Shot by Zone
+
+`score_value` records the points each attempt produced: 0 for a miss, and 2 or 3 for a make. Its average across a group of shots is the points per shot. Here it's added to the Knicks summary with `dplyr::left_join()`, so the original FG% columns stay in place for comparison.
+
+```{r}
+nyk_points <- nyk_shots_clean |>
+  group_by(shot_zone) |>
+  summarize(points_per_shot = mean(score_value, na.rm = TRUE), .groups = "drop")
+
+nyk_zone_summary <- nyk_zone_summary |>
+  left_join(nyk_points, by = "shot_zone")
+
+nyk_zone_summary |>
+  select(shot_zone, attempts, fg_pct, points_per_shot, shot_share) |>
+  arrange(desc(points_per_shot))
+```
+
+```{r}
+nyk_zone_summary |>
+  mutate(shot_zone = fct_reorder(shot_zone, points_per_shot)) |>
+  ggplot(aes(x = points_per_shot, y = shot_zone)) +
+  geom_col(fill = "#006BB6", width = 0.65) +
+  geom_text(aes(label = sprintf("%.2f", points_per_shot)), hjust = -0.2) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(
+    title = "NY Knicks Points per Shot by Zone\n(2025–26)",
+    x = "Points per shot",
+    y = NULL
+  ) +
+  theme_minimal()
+
+best_zone  <- nyk_zone_summary |> slice_max(points_per_shot, n = 1)
+worst_zone <- nyk_zone_summary |> slice_min(points_per_shot, n = 1)
+mid_range  <- nyk_zone_summary |> filter(shot_zone == "Mid-Range")
+corner_3   <- nyk_zone_summary |> filter(shot_zone == "Corner 3")
+```
+
+Measured this way, the ranking changes. Mid-range jumpers go in `r scales::percent(mid_range$fg_pct, accuracy = 0.1)` of the time, more often than corner threes at `r scales::percent(corner_3$fg_pct, accuracy = 0.1)`. But a mid-range shot produces only `r sprintf("%.2f", mid_range$points_per_shot)` points per shot, compared with `r sprintf("%.2f", corner_3$points_per_shot)` for a corner three. The best zone for the Knicks is `r best_zone$shot_zone` at `r sprintf("%.2f", best_zone$points_per_shot)` points per shot, and the worst is `r worst_zone$shot_zone` at `r sprintf("%.2f", worst_zone$points_per_shot)`.
+
+### How the Knicks Compare to the League
+
+To compare the Knicks to the rest of the NBA, every team's shots need the same zones. Instead of copying the zone code above, I wrapped it in a function so the same rules apply to all 30 teams.
+
+```{r}
+add_shot_zones <- function(shots) {
+  shots |>
+    filter(
+      !str_detect(coalesce(type_text, ""), regex("free throw", ignore_case = TRUE)),
+      !is.na(coordinate_x),
+      !is.na(coordinate_y),
+      abs(coordinate_x) <= 47,
+      abs(coordinate_y) <= 25
+    ) |>
+    mutate(
+      x_half = -abs(coordinate_x),
+      y_half = if_else(coordinate_x > 0, -coordinate_y, coordinate_y),
+      shot_distance = sqrt((x_half - (-41.75))^2 + y_half^2),
+      shot_zone = case_when(
+        shot_distance <= 8 ~ "Paint / Restricted Area",
+        (abs(y_half) >= 22 & x_half <= -33) | shot_distance >= 23.75 ~
+          if_else(abs(y_half) >= 22 & x_half <= -33, "Corner 3", "Above-the-Break 3"),
+        TRUE ~ "Mid-Range"
+      )
+    )
+}
+
+league_shots <- nba_shots |>
+  add_count(team_abbrev, name = "team_attempts") |>
+  filter(team_attempts >= 2000) |>
+  add_shot_zones()
+
+n_distinct(league_shots$team_abbrev)
+```
+
+The season data also includes the All-Star Game, where players are split into one-off teams with only a few dozen shots each. Keeping only teams with at least 2,000 shots removes those and leaves the 30 NBA teams.
+
+```{r}
+zone_comparison <- league_shots |>
+  mutate(group = if_else(team_abbrev == "NY", "Knicks", "Rest of NBA")) |>
+  group_by(group, shot_zone) |>
+  summarize(
+    attempts = n(),
+    points_per_shot = mean(score_value, na.rm = TRUE),
+    .groups = "drop_last"
+  ) |>
+  mutate(shot_share = attempts / sum(attempts)) |>
+  ungroup()
+
+zone_comparison |>
+  select(group, shot_zone, shot_share, points_per_shot) |>
+  pivot_wider(names_from = group, values_from = c(shot_share, points_per_shot))
+```
+
+`tidyr::pivot_wider()` turns the long table, with one row per group and zone, into a wide one with one row per zone. That puts the Knicks and league numbers side by side.
+
+```{r}
+#| fig-height: 6
+zone_comparison |>
+  mutate(shot_share = shot_share * 100) |>
+  pivot_longer(c(shot_share, points_per_shot), names_to = "measure", values_to = "value") |>
+  mutate(
+    measure = if_else(measure == "shot_share", "Share of all shots (%)", "Points per shot"),
+    measure = fct_relevel(measure, "Share of all shots (%)"),
+    shot_zone = fct_relevel(shot_zone, "Paint / Restricted Area", "Mid-Range",
+                            "Corner 3", "Above-the-Break 3")
+  ) |>
+  ggplot(aes(x = value, y = fct_rev(shot_zone), fill = group)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  facet_wrap(~ measure, scales = "free_x") +
+  scale_fill_manual(values = c("Knicks" = "#F58426", "Rest of NBA" = "#9AA5B4")) +
+  labs(
+    title = "Knicks vs. the Rest of the NBA by Shot Zone (2025–26)",
+    x = NULL, y = NULL, fill = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+knicks_mid <- zone_comparison |> filter(group == "Knicks", shot_zone == "Mid-Range")
+league_mid <- zone_comparison |> filter(group == "Rest of NBA", shot_zone == "Mid-Range")
+knicks_overall <- mean(league_shots$score_value[league_shots$team_abbrev == "NY"], na.rm = TRUE)
+league_overall <- mean(league_shots$score_value[league_shots$team_abbrev != "NY"], na.rm = TRUE)
+```
+
+`tidyr::pivot_longer()` stacks the two measures into one column so `facet_wrap()` can draw them side by side. The left panel shows how often each group takes each shot, and the right panel shows how many points those shots produce.
+
+Mid-range shots make up `r scales::percent(knicks_mid$shot_share, accuracy = 0.1)` of the Knicks' attempts, compared with `r scales::percent(league_mid$shot_share, accuracy = 0.1)` for the rest of the league. Across all zones, the Knicks score `r sprintf("%.3f", knicks_overall)` points per shot, compared with `r sprintf("%.3f", league_overall)` for the rest of the NBA.
+
+### The Shot Mix of the Knicks' Top Scorers
+
+The team totals hide big differences between players. This table shows where each of the six Knicks with the most attempts takes his shots, along with his points per shot.
+
+```{r}
+top_shooters <- nyk_shots_clean |>
+  count(athlete_name_1, name = "attempts") |>
+  slice_max(attempts, n = 6)
+
+player_mix <- nyk_shots_clean |>
+  semi_join(top_shooters, by = "athlete_name_1") |>
+  group_by(athlete_name_1) |>
+  mutate(points_per_shot = mean(score_value, na.rm = TRUE),
+         attempts = n()) |>
+  group_by(athlete_name_1, attempts, points_per_shot, shot_zone) |>
+  summarize(n = n(), .groups = "drop") |>
+  mutate(share = n / attempts) |>
+  select(-n) |>
+  pivot_wider(names_from = shot_zone, values_from = share, values_fill = 0) |>
+  arrange(desc(attempts))
+
+player_mix |>
+  mutate(across(c(`Paint / Restricted Area`, `Mid-Range`, `Corner 3`, `Above-the-Break 3`),
+                \(x) scales::percent(x, accuracy = 1)),
+         points_per_shot = round(points_per_shot, 2)) |>
+  select(Player = athlete_name_1, Attempts = attempts, `Points per shot` = points_per_shot,
+         `Paint / Restricted Area`, `Mid-Range`, `Corner 3`, `Above-the-Break 3`) |>
+  knitr::kable()
+
+most_mid <- player_mix |> slice_max(`Mid-Range`, n = 1)
+```
+
+`semi_join()` keeps only the shots taken by the six players in `top_shooters`, and `pivot_wider()` turns each player's zones into columns. `values_fill = 0` puts a 0 instead of `NA` for any zone where a player didn't take a shot.
+
+`r most_mid$athlete_name_1` takes the largest share of his shots from mid-range, at `r scales::percent(most_mid$"Mid-Range", accuracy = 1)`. A player's points per shot depends on both his shooting and his shot selection. Mid-range shots are the least efficient zone for the team, so a player who takes a lot of them needs to make them at a high rate to keep up.
+
+### What This Adds
+
+- **A better measure:** Points per shot accounts for threes being worth more, so it ranks zones by how much they actually help the team score. FG% doesn't.
+- **Context:** Comparing with the other 29 teams shows whether the Knicks' shot choices are typical or unusual.
+- **Player detail:** The breakdown shows that the team's shot mix comes from a few players with very different styles.
+- **New tidyverse tools:** `left_join()`, `add_count()`, `semi_join()`, `pivot_wider()`, `pivot_longer()`, `fct_relevel()`, and a reusable function, so the same zone rules apply to every team.
