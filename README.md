@@ -169,8 +169,8 @@ Revision/Addition Description and Link: _TBD_
 ### Kevin V
 Initial Description and Link: `fct_lump_n()`, `fct_collapse()`, and other forcats functions on the NYC Dog Licensing dataset — [kevin_v_forcats_nyc_dogs.qmd](vignettes/kevin_v_forcats_nyc_dogs.qmd)
 
-   Revision/Addition Description and Link: Added points per shot, a Knicks vs. NBA comparison, and a player shot-mix breakdown (`pivot_wider()`, `pivot_longer()`) to Kailot H's Knicks shot-chart vignette
-
+   Revision/Addition Description and Link: Added points per shot, a Knicks vs. NBA comparison, and a player shot-mix breakdown (`pivot_wider()`, `pivot_longer()`) to Kailot H's Knicks shot-chart vignette — [PR #29](https://github.com/acatlin/FALL2026TIDYVERSE/pull/29)
+   
 ### Lakeranie B
 Initial Description and Link: This project explores flight delays at JFK, LaGuardia, and Newark airports during 2013 using the nycflights13 dataset. I used Tidyverse packages such as dplyr and ggplot2 to clean, organize, and analyze flight records. The analysis compares departure delay rates by month and airline, using summary tables and visualizations to identify patterns.
 
