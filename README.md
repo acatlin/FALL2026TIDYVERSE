@@ -255,7 +255,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Ummay R
-Initial Description and Link: _TBD_
+Initial Description and Link: `pivot_longer()` on the `iris` dataset — [ummay_r_iris_pivot_longer.qmd](vignettes/ummay_r_iris_pivot_longer.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
