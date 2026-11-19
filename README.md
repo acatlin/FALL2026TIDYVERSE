@@ -51,6 +51,12 @@ Initial Description and Link: Demonstrates dplyr, tidyr, and ggplot2 using inter
 
 Revision/Addition Description and Link: _TBD_
 
+### Akash S
+Initial Description and Link: Demonstrates dplyr and ggplot2 by comparing city and highway fuel economy using the mpg dataset — [akash_s_mpg.qmd](vignettes/akash_s_mpg.qmd)
+
+Revision/Addition Description and Link: _TBD_
+
+
 ### Andy C
 Initial Description and Link: _TBD_
 
