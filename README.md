@@ -157,7 +157,7 @@ Initial Description and Link: `case_when()`, `summarize()`, `fct_reorder()`, and
 Revision/Addition Description and Link: _TBD_
 
 ### Keenan R
-Initial Description and Link: _TBD_
+Initial Description and Link: basic tidyverse functions used to analyze gender and pay [Keenan-gender-pay-analysis.qmd](vignettes/Keenan-gender-pay-analysis.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
