@@ -1,0 +1,124 @@
+---
+title: "TidyVerse CREATE: Exploring College Majors with dplyr"
+author: "Daanish"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+---
+
+## Introduction
+
+This vignette shows how to use core dplyr verbs on FiveThirtyEight's recent college graduates dataset (<https://github.com/fivethirtyeight/data/tree/master/college-majors>). Each row is a major, with pay, employment, and gender-mix figures.
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+## 1. Load the data from a URL
+
+```{r load}
+url <- "https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/recent-grads.csv"
+grads <- read_csv(url, show_col_types = FALSE)
+glimpse(grads)
+```
+
+## 2. Select, rename, and drop missing rows
+
+`select()` keeps the columns we need, `rename_with()` standardizes the names, and `drop_na()` removes the incomplete row(s).
+
+```{r clean}
+grads_clean <- grads |>
+  select(Major, Major_category, Total, Men, Women, ShareWomen,
+         Employed, Unemployed, Unemployment_rate,
+         Median, P25th, P75th, College_jobs, Non_college_jobs) |>
+  rename_with(str_to_lower) |>
+  rename(share_women = sharewomen) |>
+  drop_na()
+
+nrow(grads); nrow(grads_clean)
+```
+
+## 3. Create new columns with `mutate()` and `case_when()`
+
+```{r mutate}
+grads_feat <- grads_clean |>
+  mutate(
+    college_job_share = college_jobs / (college_jobs + non_college_jobs),
+    pay_spread        = p75th - p25th,
+    pay_tier = case_when(
+      median >= 60000 ~ "High",
+      median >= 45000 ~ "Mid",
+      .default = "Lower"
+    ),
+    gender_mix = case_when(
+      share_women >= 0.6 ~ "Women-majority",
+      share_women <= 0.4 ~ "Men-majority",
+      .default = "Balanced"
+    )
+  )
+
+grads_feat |> select(major, median, pay_tier, share_women, gender_mix) |> head()
+```
+
+## 4. Summarize by group with `across()`
+
+`across()` applies the same function to several columns at once, and `.names` controls the output column names.
+
+```{r summarise}
+by_category <- grads_feat |>
+  group_by(major_category) |>
+  summarise(
+    n_majors = n(),
+    graduates = sum(total),
+    across(c(median, unemployment_rate, college_job_share),
+           \(x) mean(x), .names = "avg_{.col}"),
+    .groups = "drop"
+  ) |>
+  arrange(desc(avg_median))
+
+by_category
+```
+
+## 5. Find top rows with `slice_max()`
+
+Top five majors overall by median pay:
+
+```{r slice-top}
+grads_feat |>
+  slice_max(median, n = 5) |>
+  select(major, major_category, median, unemployment_rate)
+```
+
+Highest-paying major within each category (`slice_max()` respects grouping):
+
+```{r slice-group}
+grads_feat |>
+  group_by(major_category) |>
+  slice_max(median, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  select(major_category, major, median) |>
+  arrange(desc(median))
+```
+
+## 6. Count combinations with `count()`
+
+```{r count}
+grads_feat |>
+  count(gender_mix, pay_tier) |>
+  pivot_wider(names_from = pay_tier, values_from = n, values_fill = 0)
+```
+
+## 7. Visualize the summary
+
+```{r plot, fig.height=5, fig.width=8}
+by_category |>
+  ggplot(aes(x = avg_median, y = fct_reorder(major_category, avg_median))) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(labels = scales::label_dollar()) +
+  labs(title = "Average Median Pay by Major Category",
+       x = "Average median earnings", y = NULL)
+```
+
+The data cleaning process involved a combination of a few dplyr functions. We engineered the pay and gender_mixed variables, grouped by categories, and found the top performers. Engineering majors have high average pay, and the across function along with slice_max reduces repetitive coding significantly. Extensions include weighting by totals and comparing unemployment_rate by gender_mixed.
