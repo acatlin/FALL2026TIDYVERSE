@@ -1,0 +1,173 @@
+---
+title: "Working on Many Columns at Once with dplyr across()"
+subtitle: "A TidyVerse vignette using food delivery order data"
+author: "Kenny Jeannite"
+date: today
+format:
+  html:
+    toc: true
+    embed-resources: true
+    df-print: kable
+execute:
+  warning: false
+  message: false
+---
+
+## Introduction
+
+A lot of data work is doing the same thing to several columns. For example, I might want the average of four different columns. Without help, that means typing the same function once for each column.
+
+The `across()` function in **dplyr** fixes this. It lets me pick a set of columns and apply a function to all of them in one line. In this vignette I am showing how to use it inside `summarise()` and `mutate()`.
+
+I am using the [Global Food Delivery Restaurant Market 2026](https://www.kaggle.com/datasets/luthfimuthathohirin/global-food-delivery-restaurant-market-2026) dataset from Kaggle. It has 8,000 restaurant orders, and each row is one order. This dataset appears to be synthetic, meaning it was generated and is not real order records, so the numbers below are a demonstration of the function and not facts about food delivery.
+
+## Load the data
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+url <- "https://raw.githubusercontent.com/kjeannite/data-607/master/tidyverse-create/global_food_delivery_enriched_market_2026.csv"
+
+orders <- read_csv(url) |>
+  select(!c(cot_market_dynamics_rationale, confidence_score))
+
+glimpse(orders)
+```
+
+I dropped two columns I don't need. One is a long paragraph of text for each order and the other is a score that is not about the order itself.
+
+The column names follow a pattern that is useful later. The money columns end in `_usd` and the time columns end in `_min`.
+
+## The problem: repeating yourself
+
+Each order comes from one of three channels: a delivery app, takeaway, or dine-in. Say I want to compare the channels on four columns. This is how I would write it without `across()`:
+
+```{r}
+orders |>
+  group_by(order_channel) |>
+  summarise(
+    order_value_usd      = mean(order_value_usd),
+    discount_applied_usd = mean(discount_applied_usd),
+    delivery_fee_usd     = mean(delivery_fee_usd),
+    customer_rating      = mean(customer_rating)
+  )
+```
+
+This works, but I typed every column name twice and `mean()` four times.
+
+## across() inside summarise()
+
+`across()` takes two things. The first is the columns to work on, and the second is the function to apply to each one. This gives the same table as above:
+
+```{r}
+orders |>
+  group_by(order_channel) |>
+  summarise(
+    across(c(order_value_usd, discount_applied_usd, delivery_fee_usd, customer_rating), mean)
+  )
+```
+
+I wrote `mean` without parentheses because I am handing `across()` the function itself. It then calls the function once for each column.
+
+If I want to do more than one step, I can write a small function with `\(x)`. The `x` stands for whichever column `across()` is working on. Here I am rounding each average to two decimals:
+
+```{r}
+orders |>
+  group_by(order_channel) |>
+  summarise(
+    across(
+      c(order_value_usd, discount_applied_usd, delivery_fee_usd, customer_rating),
+      \(x) round(mean(x), 2)
+    )
+  )
+```
+
+The three channels have about the same average order value, and only the delivery app charges a delivery fee.
+
+## Picking columns without typing them
+
+I don't have to type every column name. `across()` accepts the same helpers that `select()` does. `ends_with("_min")` picks every time column:
+
+```{r}
+orders |>
+  group_by(order_channel) |>
+  summarise(across(ends_with("_min"), \(x) round(mean(x), 2)))
+```
+
+The delivery app has the longest total time from order to food in hand.
+
+## across() inside mutate()
+
+`across()` works the same way in `mutate()`. The difference is that it changes the columns row by row instead of collapsing them into a summary.
+
+Another helper is `where(is.numeric)`, which picks every column that holds numbers. Here I am rounding all of them to one decimal:
+
+```{r}
+orders |>
+  mutate(across(where(is.numeric), \(x) round(x, 1))) |>
+  select(order_id, order_value_usd, delivery_speed_km_per_hr, delivery_fee_ratio) |>
+  head()
+```
+
+## Putting it together
+
+To finish, I am using `across()` to answer one question: for delivery app orders, what happens to delivery time, delivery fee, and rating when the weather gets worse?
+
+```{r}
+weather_levels <- c("Clear", "Cloudy / Fog", "Rainy", "Heavy Rain / Storm")
+
+delivery_summary <- orders |>
+  filter(order_channel == "Online Delivery App") |>
+  mutate(weather_condition = factor(weather_condition, levels = weather_levels)) |>
+  group_by(weather_condition) |>
+  summarise(
+    across(c(actual_delivery_time_min, delivery_fee_usd, customer_rating), \(x) round(mean(x), 2))
+  )
+
+delivery_summary
+```
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+#| fig-alt: "Bar chart of average delivery time in minutes for delivery app orders by weather. Clear and cloudy weather are about the same, rainy is higher, and heavy rain or storm is the highest."
+
+ggplot(delivery_summary, aes(x = weather_condition, y = actual_delivery_time_min)) +
+  geom_col(fill = "#0072B2", width = 0.6) +
+  geom_text(aes(label = actual_delivery_time_min), vjust = -0.5) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Deliveries take the longest in heavy rain or storms",
+    subtitle = "Average delivery time for delivery app orders",
+    x = NULL,
+    y = "Minutes"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+```
+
+In this dataset, clear and cloudy weather look about the same. In heavy rain or storms, the average delivery takes the longest, costs the most, and gets the lowest rating.
+
+## Conclusion
+
+`across()` let me replace repeated lines with one line that says which columns and which function. I showed how to:
+
+- Use `across(columns, function)` inside `summarise()` to summarise many columns at once.
+- Use `ends_with()` and `where()` to pick columns by name or type.
+- Use `across()` inside `mutate()` to change many columns at once.
+
+Some ideas for extending this vignette:
+
+- Give `across()` a list of functions, like `list(mean = mean, median = median)`, and use `.names` to name the new columns.
+- Use `if_any()` and `if_all()` inside `filter()` to keep rows based on several columns.
+- Repeat the last section for `cuisine_category` or `metro_city` instead of weather.
+
+## Sources
+
+- Dataset: [Global Food Delivery Restaurant Market 2026](https://www.kaggle.com/datasets/luthfimuthathohirin/global-food-delivery-restaurant-market-2026), from Kaggle. I am using the file `global_food_delivery_enriched_market_2026.csv`.
+- dplyr documentation for [`across()`](https://dplyr.tidyverse.org/reference/across.html) and the [column-wise operations article](https://dplyr.tidyverse.org/articles/colwise.html).
