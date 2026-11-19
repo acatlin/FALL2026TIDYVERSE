@@ -116,3 +116,51 @@ genre_counts %>%
 This demonstrates how `separate_longer_delim()` converts a multi-value column into a tidy, analysis-ready structure. `mutate()` and `str_trim()` clean the resulting text, while `filter()`, `count()`, and `arrange()` support comparisons across content categories. Finally, `ggplot2` visualizes the category frequencies. This workflow can also be applied to survey answers, product tags, and other comma separated fields.
 
 **Data source:** [Netflix Movies and TV Shows on Kaggle](https://www.kaggle.com/datasets/shivamb/netflix-shows).
+
+## Cecilia D Addition
+
+## Introduction
+
+This extension builds on the Netflix Movies and TV Shows dataset to explore which directors are associated with the most titles. The original vignette uses `separate_longer_delim()` to split multiple categories into individual rows. I apply the same function to the `director` column, where some titles have multiple directors listed separated by a comma. After removing NA and missing values, I separate the names into individual rows. Then I use `count()` and `arrange()` to rank directors by the number of titles they are associated with. Finally, I use `ggplot2` to visualize the ten top directors.
+
+## Subset dataset
+```{r}
+# Create new df
+netflix_directors <- netflix %>%
+  select(show_id, title, type, release_year, listed_in, director) %>% # Keep the columns needed for the director analysis.
+  filter(!is.na(director), director != "") %>% #Remove titles with missing or empty director information.
+  separate_longer_delim(director, delim = ",") %>% #Separate multiple directors into individual rows.
+  mutate(director = str_trim(director)) #Trim extra spaces around director names.
+```
+## Count directors
+```{r}
+# Count the number of titles associated with each director.
+director_counts <- netflix_directors %>%
+  count(director, name = "titles") %>% 
+  arrange(desc(titles)) # Sort directors from the highest number of titles to the lowest.
+
+# Display the ten directors with the most titles.
+director_counts %>%
+  slice_head(n = 10)
+```
+## Visualize
+
+One important consideration is that titles with multiple directors contribute one count to each director. Therefore, the results represent the number of titles associated with each director, rather than titles directed exclusively by them.
+
+```{r}
+# Create a horizontal bar chart of the 10 directors associated with the highest number of Netflix titles.
+director_counts %>%
+  slice_max(order_by = titles, n = 10, with_ties = FALSE) %>%
+  ggplot(aes(x = reorder(director, titles), y = titles)) +
+  geom_col(fill = "#C62798") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Directors by Number of Netflix Titles",
+    x = "Director",
+    y = "Number of titles"
+  ) +
+  theme_minimal(base_size = 12)
+```
+## Conclusion
+
+I initially expected the ranking to be dominated by directors associated with major films, like Martin Scorsese. Surprisingly, he only appeared in the ninth place. The top-ranked director, Rajiv Chilaka, was unfamiliar to me, so I looked him up and discovered that he has directed several animated films. This was an interesting find because it highlights how diverse Netflix's catalog can be, differing from my expectation of a list dominated by mainstream films.

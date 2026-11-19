@@ -1,0 +1,210 @@
+---
+title: "Comparing City and Highway Fuel Economy with dplyr and ggplot2"
+author: "Akash Sourav"
+format:
+  html:
+    toc: true
+    embed-resources: true
+execute:
+  echo: true
+  message: false
+  warning: true
+---
+
+## Purpose
+
+Which vehicle classes have the highest average highway fuel economy, and how
+much higher is highway mileage than city mileage in this dataset?
+
+This vignette demonstrates how to use `dplyr` to select variables, filter rows,
+create a variable, and summarize groups, then use `ggplot2` to visualize the
+results. The example uses `ggplot2::mpg`, so no downloaded data file, API key,
+or working-directory change is required.
+
+## Setup and data source
+
+Use R 4.1 or later for the native pipe, `|>`. If needed, run
+`install.packages(c("dplyr", "ggplot2", "knitr"))` once in the R console before
+rendering. Package installation is deliberately kept outside the executable
+analysis.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(ggplot2)
+
+# mpg is included with ggplot2; copying it leaves the original data unchanged.
+cars <- ggplot2::mpg
+```
+
+The [ggplot2 documentation](https://ggplot2.tidyverse.org/reference/mpg.html)
+describes `mpg` as a subset of EPA fuel-economy data. It contains vehicle
+configurations from 1999 and 2008. A model can appear in multiple rows because
+its year, engine, transmission, or other characteristics can differ. A row
+therefore represents a configuration, not a distinct model or a vehicle sale.
+
+The main variables used here are `class` (vehicle class), `cty` (city miles per
+gallon), and `hwy` (highway miles per gallon). Higher mpg means more distance
+traveled per gallon of fuel.
+
+## 1. Inspect and select the variables
+
+`select()` chooses columns. `summarise()` without grouping produces one summary
+row for the entire dataset. `n()` counts rows, while `n_distinct()` counts
+different values.
+
+```{r}
+#| label: inspect-data
+cars_selected <- cars |>
+  select(manufacturer, model, year, class, cty, hwy)
+
+data_check <- cars_selected |>
+  summarise(
+    records = n(),
+    vehicle_classes = n_distinct(class),
+    missing_class = sum(is.na(class)),
+    missing_city = sum(is.na(cty)),
+    missing_highway = sum(is.na(hwy))
+  )
+
+knitr::kable(data_check, caption = "Dataset size and missing-value checks")
+```
+
+## 2. Filter rows and create a new variable
+
+`filter()` keeps rows satisfying the stated conditions. The checks below keep
+records with a known class and positive, nonmissing mpg values. `mutate()` adds
+`highway_gain`, the difference between highway and city mpg for each record.
+For example, 30 highway mpg and 22 city mpg produce a gain of 8 mpg.
+
+```{r}
+#| label: prepare-data
+cars_clean <- cars_selected |>
+  filter(
+    !is.na(class),
+    !is.na(cty),
+    !is.na(hwy),
+    cty > 0,
+    hwy > 0
+  ) |>
+  mutate(highway_gain = hwy - cty)
+
+rows_removed <- nrow(cars_selected) - nrow(cars_clean)
+
+knitr::kable(
+  head(cars_clean, 6),
+  caption = "First six records, including the new highway_gain variable"
+)
+```
+
+The filters remove **`r rows_removed` records**, leaving **`r nrow(cars_clean)`**
+for analysis. I retain both years and all vehicle configurations. I do not
+remove repeated model names because configurations are legitimate observations.
+No missing values are imputed, and mpg values are kept in their original units.
+
+## 3. Group, summarize, and rank vehicle classes
+
+`group_by(class)` makes the following calculations run separately for each
+vehicle class. `summarise()` returns one row per class; `.groups = "drop"`
+returns an ungrouped result. `arrange(desc(mean_highway))` sorts the class
+averages from highest to lowest highway mpg.
+
+```{r}
+#| label: summarize-classes
+class_summary <- cars_clean |>
+  group_by(class) |>
+  summarise(
+    records = n(),
+    mean_city = mean(cty),
+    mean_highway = mean(hwy),
+    mean_highway_gain = mean(highway_gain),
+    .groups = "drop"
+  ) |>
+  arrange(desc(mean_highway))
+
+# Round only the displayed table; keep full precision in class_summary.
+knitr::kable(
+  class_summary,
+  digits = 1,
+  col.names = c("Class", "Records", "Mean city mpg", "Mean highway mpg",
+                "Mean highway gain (mpg)"),
+  caption = "Fuel economy by vehicle class, pooling 1999 and 2008"
+)
+```
+
+## 4. Visualize the grouped results
+
+`ggplot()` starts a plot and `aes()` maps variables to visual properties.
+`geom_col()` uses the already calculated mean as the bar height. This differs
+from the default `geom_bar()`, which counts rows. `reorder()` orders the class
+labels by their highway averages, and `coord_flip()` makes the labels easier
+to read.
+
+```{r}
+#| label: fig-highway-by-class
+#| fig-cap: "Average highway mpg by vehicle class. Each configuration receives equal weight."
+#| fig-width: 8
+#| fig-height: 5
+ggplot(class_summary, aes(x = reorder(class, mean_highway), y = mean_highway)) +
+  geom_col(fill = "#356B8C", width = 0.7) +
+  coord_flip() +
+  labs(
+    title = "Compact cars have the highest average highway mpg in this sample",
+    subtitle = "EPA configurations in ggplot2::mpg, 1999 and 2008 combined",
+    x = "Vehicle class",
+    y = "Mean highway fuel economy (mpg)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Findings and limitations
+
+```{r}
+#| label: calculate-findings
+# Take the first and last rows of the table already sorted by highway mpg.
+highest_class <- class_summary |> slice_head(n = 1)
+lowest_class <- class_summary |> slice_tail(n = 1)
+overall_gain <- mean(cars_clean$highway_gain)
+class_gap <- highest_class$mean_highway - lowest_class$mean_highway
+```
+
+- **`r highest_class$class`** has the highest class average highway fuel economy
+  at **`r round(highest_class$mean_highway, 1)` mpg**, based on
+  **`r highest_class$records` configurations**.
+- **`r lowest_class$class`** has the lowest class average at
+  **`r round(lowest_class$mean_highway, 1)` mpg**, based on
+  **`r lowest_class$records` configurations**. The highest and lowest class
+  averages differ by **`r round(class_gap, 1)` mpg**.
+- Across all configurations, highway fuel economy exceeds city fuel economy
+  by **`r round(overall_gain, 1)` mpg on average**. This is the average of the
+  row-level differences, not an average of equally weighted class averages.
+
+These are descriptive comparisons of this sample. The classes have different
+numbers of configurations, and a class average can hide differences among its
+models. Every configuration receives equal weight; these are not sales-weighted
+averages. The data cover two historical years and a selected set of models, so
+the findings should not be generalized to all cars or today's vehicle market.
+The analysis does not establish that vehicle class causes a particular mpg.
+
+This workflow shows how to move from row-level data to a readable comparison:
+`select()` chooses variables, `filter()` checks usable records, `mutate()`
+creates a measure, `group_by()` and `summarise()` calculate class statistics,
+and `arrange()` and `ggplot2` make those results easier to interpret.
+
+## Reproducibility
+
+Save this file and click **Render** in RStudio, or run
+`quarto render vignettes/akash_s_mpg.qmd` from the repository root. All results
+are computed from the bundled dataset. The following records the R and package
+versions used during rendering.
+
+```{r}
+#| label: session-information
+sessionInfo()
+```
+
+## References
+
+- [ggplot2: mpg dataset documentation](https://ggplot2.tidyverse.org/reference/mpg.html)
+- [dplyr: introduction and core verbs](https://dplyr.tidyverse.org/articles/dplyr.html)
+- [ggplot2: geom_col and geom_bar](https://ggplot2.tidyverse.org/reference/geom_bar.html)

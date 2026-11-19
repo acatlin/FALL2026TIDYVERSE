@@ -1,0 +1,157 @@
+---
+title: "TidyVerse CREATE: College Majors and Earnings"
+format: html
+editor: visual
+---
+
+## Introduction
+
+We will be exploring the employment and earnings of recent college graduates using several TidyVerse packages working together. The data comes from the FiveThirtyEight article "The Economic Guide To Picking A College Major" and is stored in a file called recent-grads.csv. To do this, we will first import the data directly from github with readr, clean it with dplyr and stringr, and then summarise, reshape, and visualize it with dplyr, tidyr, forcats, and ggplot2.
+
+```{r}
+#| title: get-data
+#| message: False 
+
+library(tidyverse)
+
+url <- "https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/recent-grads.csv"
+
+grads_raw <- read_csv(url)
+
+glimpse(grads_raw)
+```
+
+## Cleaning the Data
+
+The original file has many columns that we do not need, so we will use select() to keep only the ones related to gender, employment, and pay. The Major column is written in all capital letters, so we will use str_to_title() from stringr to make it easier to read. Finally we will use drop_na() to remove any major with missing values so that our calculations later on do not break.
+
+```{r}
+#| title: clean-data
+
+grads <- grads_raw |> 
+  select(Major, Major_category, Total, Men, Women, ShareWomen,
+         Employed, Unemployed, Unemployment_rate, Median, P25th, P75th) |>
+  mutate(Major = str_to_title(Major)) |>
+  drop_na()
+
+head(grads)
+```
+
+## New Variables
+
+In order to compare majors we will create two new columns using mutate(). The first is pay_spread, which is the difference between the 75th and 25th percentile of earnings and shows how much pay varies within a major. The second uses case_when() to label each major as female-dominated, male-dominated, or balanced based on the share of women. A major with 60 percent or more women is female-dominated and a major with 40 percent or less is male-dominated. Everything else is balanced.
+
+```{r}
+#| title: new-variables
+
+grads <- grads |>
+  mutate(
+    pay_spread = P75th - P25th,
+    gender_mix = case_when(
+      ShareWomen >= 0.60 ~ "Female-dominated",
+      ShareWomen <= 0.40 ~ "Male-dominated",
+      TRUE               ~ "Balanced"
+    )
+  )
+
+grads |> count(gender_mix)
+```
+
+## Filter and Slice
+
+Now we can ask which majors earn the most and the least. Some majors have very few graduates, which can make their median pay unreliable, so we will first filter() to majors with at least 1,000 graduates. We then use slice_max() and slice_min() to pull out the top ten and bottom ten majors by median pay.
+
+```{r}
+#| title: top-bottom-earners
+
+top_earners <- grads |>
+  filter(Total >= 1000) |>
+  slice_max(Median, n = 10) |>
+  select(Major, Major_category, Median, Unemployment_rate)
+
+top_earners
+
+bottom_earners <- grads |>
+  filter(Total >= 1000) |>
+  slice_min(Median, n = 10) |>
+  select(Major, Major_category, Median, Unemployment_rate)
+
+bottom_earners
+```
+
+## Group and Summarise
+
+To see the bigger picture we will group the majors by their category and summarise each group. For every category we will calculate the number of majors, the total number of graduates, the average median pay, and the average unemployment rate. The results are then sorted from highest to lowest pay with arrange().
+
+```{r}
+#| title: category-summary
+
+category_summary <- grads |>
+  group_by(Major_category) |>
+  summarise(
+    n_majors         = n(),
+    total_grads      = sum(Total),
+    avg_median_pay   = mean(Median),
+    avg_unemployment = mean(Unemployment_rate),
+    .groups = "drop"
+  ) |>
+  arrange(desc(avg_median_pay))
+
+category_summary
+```
+
+## Visualization
+
+With the summary complete we can plot it. The function fct_reorder() from forcats sorts the bars by value so the chart is much easier to read than the default alphabetical order. After that we look at whether the share of women in a major is related to its median pay by using a scatter plot with a trend line.
+
+```{r}
+#| title: plots
+#| fig-height: 6
+#| fig-width: 8
+
+category_summary |>
+  mutate(Major_category = fct_reorder(Major_category, avg_median_pay)) |>
+  ggplot(aes(x = Major_category, y = avg_median_pay)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(x = "Major Category", y = "Average Median Earnings")
+
+ggplot(grads, aes(x = ShareWomen, y = Median)) +
+  geom_point(aes(color = gender_mix), alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(x = "Share of Women", y = "Median Earnings", color = "Gender Mix")
+```
+
+## Reshaping
+
+Our data has separate Men and Women columns, which is known as wide format. Most ggplot2 charts work better with long format where each row is one category and one gender. We will use pivot_longer() from tidyr to combine the two columns into a gender column and a graduates column, and then compare the number of graduates by gender in each major category.
+
+```{r}
+#| title: pivot
+#| fig-height: 6
+#| fig-width: 8
+
+gender_long <- grads |>
+  group_by(Major_category) |>
+  summarise(Men = sum(Men), Women = sum(Women), .groups = "drop") |>
+  pivot_longer(cols = c(Men, Women),
+               names_to = "gender",
+               values_to = "graduates")
+
+head(gender_long)
+
+gender_long |>
+  mutate(Major_category = fct_reorder(Major_category, graduates, .fun = sum)) |>
+  ggplot(aes(x = Major_category, y = graduates, fill = gender)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Major Category", y = "Number of Graduates", fill = "Gender")
+```
+
+## Conclusion
+
+Using only a few TidyVerse functions chained together with the pipe we were able to import, clean, transform, summarise, reshape, and visualize a real dataset. The highest paying major with at least 1,000 graduates was `r top_earners$Major[1]` with a median of `r scales::dollar(top_earners$Median[1])`, while the lowest was `r bottom_earners$Major[1]` with a median of `r scales::dollar(bottom_earners$Median[1])`. The correlation between the share of women in a major and its median pay was `r round(cor(grads$ShareWomen, grads$Median), 2)`, which means majors with more women tended to have lower median pay in this data. The category with the highest average pay was `r category_summary$Major_category[1]`. This does not show that gender causes the pay difference, since the majors themselves differ in the kind of work they lead to.
