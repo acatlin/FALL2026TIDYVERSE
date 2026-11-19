@@ -102,7 +102,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Dillon L
-Initial Description and Link: _TBD_
+Initial Description and Link: Exploring N64 genres with filter(), count(), and arrange() — [dillon_l_n64_genres.qmd](vignettes/dillon_l_n64_genres.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
