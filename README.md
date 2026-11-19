@@ -52,6 +52,12 @@ Initial Description and Link: Demonstrates dplyr, tidyr, and ggplot2 using inter
 
 Revision/Addition Description and Link: *TBD*
 
+### Akash S
+Initial Description and Link: Demonstrates dplyr and ggplot2 by comparing city and highway fuel economy using the mpg dataset — [akash_s_mpg.qmd](vignettes/akash_s_mpg.qmd)
+
+Revision/Addition Description and Link: _TBD_
+
+
 ### Andy C
 
 Initial Description and Link: *TBD*
@@ -113,6 +119,7 @@ Initial Description and Link: *TBD*
 Revision/Addition Description and Link: *TBD*
 
 ### Dillon L
+Initial Description and Link: Exploring N64 genres with filter(), count(), and arrange() — [dillon_l_n64_genres.qmd](vignettes/dillon_l_n64_genres.qmd)
 
 Initial Description and Link: *TBD*
 
@@ -143,6 +150,7 @@ Initial Description and Link: *TBD*
 Revision/Addition Description and Link: *TBD*
 
 ### Esra D
+Initial Description and Link: `left_join()` and `case_when()` from dplyr on ultramarathon race data — [esra_d_ultra_running_age.qmd](https://github.com/acatlin/FALL2026TIDYVERSE/blob/main/vignettes/esra_d_ultra_running_age.qmd)
 
 Initial Description and Link: *TBD*
 
@@ -179,12 +187,14 @@ Initial Description and Link: `case_when()`, `summarize()`, `fct_reorder()`, and
 Revision/Addition Description and Link: *TBD*
 
 ### Keenan R
+Initial Description and Link: basic tidyverse functions used to analyze gender and pay [Keenan-gender-pay-analysis.qmd](vignettes/Keenan-gender-pay-analysis.qmd)
 
 Initial Description and Link: *TBD*
 
 Revision/Addition Description and Link: *TBD*
 
 ### Kenny J
+Initial Description and Link: dplyr `across()` for working on many columns at once, using a food delivery orders dataset — [kenny_j_dplyr_across.qmd](vignettes/kenny_j_dplyr_across.qmd)
 
 Initial Description and Link: *TBD*
 
@@ -241,6 +251,7 @@ Initial Description and Link: This vignette demonstrates how to use the **Tidyve
 Revision/Addition Description and Link: *TBD*
 
 ### Muntasir M
+Initial Description and Link: Analyzing Vehicle Fuel Efficiency with Tidyverse. This vignette demonstrates how to use filter(), mutate(), group_by(), summarise(), arrange(), and ggplot2 to analyze and visualize vehicle fuel efficiency using the mpg dataset.
 
 Initial Description and Link: *TBD*
 
@@ -283,6 +294,7 @@ Initial Description and Link: *TBD*
 Revision/Addition Description and Link: *TBD*
 
 ### Supriya P
+Initial Description and Link: `rename_with()` and `across()` from dplyr on FiveThirtyEight's Bad Drivers data, comparing driver behavior with car insurance premiums. [supriya_p_across_bad_drivers.qmd](vignettes/supriya_p_across_bad_drivers.qmd)
 
 Initial Description and Link: *TBD*
 
@@ -295,6 +307,7 @@ Initial Description and Link: *TBD*
 Revision/Addition Description and Link: *TBD*
 
 ### Ummay R
+Initial Description and Link: `pivot_longer()` on the `iris` dataset — [ummay_r_iris_pivot_longer.qmd](vignettes/ummay_r_iris_pivot_longer.qmd)
 
 Initial Description and Link: *TBD*
 
@@ -313,6 +326,7 @@ Initial Description and Link: *TBD*
 Revision/Addition Description and Link: *TBD*
 
 ### Yeimi P
+Initial Description and Link: Demonstrates `dplyr`, `tidyr`, and `ggplot2` using New Jersey housing market data from 2016 to 2026. Analyzes quarterly home price index trends, year-over-year percentage changes, and visual comparisons using FHFA housing data — [yeimi_p_nj_housing_2016_2026.qmd](vignettes/yeimi_p_nj_housing_2016_2026.qmd)
 
 Initial Description and Link: *TBD*
 

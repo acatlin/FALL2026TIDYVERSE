@@ -1,0 +1,66 @@
+---
+title: "Reshaping Iris Measurements with pivot_longer()"
+author: "Ummay Rukiya"
+format: html
+---
+
+## Why reshape the data?
+
+I wanted to find the average length and width of the sepals and petals for each iris species. In the built-in `iris` dataset, each flower has its own row, but the four measurements are in four separate columns. That layout works well if I want to look at one flower at a time. To summarize the measurements with the same code, I used `pivot_longer()` to turn those four columns into rows.
+
+```{r}
+#| message: false
+library(tidyr)
+library(dplyr)
+
+iris_wide <- iris |>
+  mutate(flower_id = row_number(), .before = 1)
+
+head(iris_wide, 3)
+```
+
+I added a flower ID before reshaping so I can still tell which measurements came from the same flower.
+
+## Turn measurement columns into rows
+
+```{r}
+iris_long <- iris_wide |>
+  pivot_longer(
+    cols = c(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width),
+    names_to = c("part", "dimension"),
+    names_sep = "[.]",
+    values_to = "measurement_cm"
+  )
+
+head(iris_long, 8)
+```
+
+The `cols` argument tells R which columns to reshape. With `names_to` and `names_sep`, I split each old column name at the period. For example, `Sepal.Length` becomes `Sepal` in the `part` column and `Length` in the `dimension` column. The actual value goes into `measurement_cm`, while the flower ID and species stay with each measurement.
+
+```{r}
+c(wide_rows = nrow(iris_wide), long_rows = nrow(iris_long))
+```
+
+The number of rows goes from 150 to 600 because each flower now has four rows, one for each measurement. They still represent the same 150 flowers.
+
+## Summarize the measurements
+
+```{r}
+iris_summary <- iris_long |>
+  group_by(Species, part, dimension) |>
+  summarize(
+    flowers = n_distinct(flower_id),
+    average_cm = round(mean(measurement_cm), 2),
+    .groups = "drop"
+  )
+
+print(iris_summary, n = 12)
+```
+
+I grouped by species, flower part, and dimension so I could compare lengths and widths separately. For example, the average petal length is about 1.46 cm for setosa and 5.55 cm for virginica in this dataset. What I found useful about the long format is that I could calculate all 12 averages with one summary.
+
+## Sources
+
+- [R's built-in iris dataset](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/iris.html)
+- [tidyr documentation for pivot_longer()](https://tidyr.tidyverse.org/reference/pivot_longer.html)
+
