@@ -133,7 +133,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Esra D
-Initial Description and Link: _TBD_
+Initial Description and Link: `left_join()` and `case_when()` from dplyr on ultramarathon race data — [esra_d_ultra_running_age.qmd](https://github.com/acatlin/FALL2026TIDYVERSE/blob/main/vignettes/esra_d_ultra_running_age.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
