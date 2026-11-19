@@ -270,7 +270,7 @@ Initial Description and Link: _TBD_
 Revision/Addition Description and Link: _TBD_
 
 ### Yeimi P
-Initial Description and Link: _TBD_
+Initial Description and Link: Demonstrates `dplyr`, `tidyr`, and `ggplot2` using New Jersey housing market data from 2016 to 2026. Analyzes quarterly home price index trends, year-over-year percentage changes, and visual comparisons using FHFA housing data — [yeimi_p_nj_housing_2016_2026.qmd](vignettes/yeimi_p_nj_housing_2016_2026.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
