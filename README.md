@@ -282,6 +282,7 @@ Initial Description and Link: *TBD*
 Revision/Addition Description and Link: *TBD*
 
 ### Shanice S
+Initial Description and Link: Using the 2019 NYC Subway Rider Survey dataset, my vignette utilizes the tidyverse packages to read a CSV, mutate date-times, and extract list values from over 10K records of historical data. [Vignette](vignettes/shanice_s_subwayrider.qmd)
 
 Initial Description and Link: *TBD*
 
