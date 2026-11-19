@@ -1,0 +1,158 @@
+---
+title: "Working Across Many Columns with dplyr: rename_with() and across()"
+author: "Supriya P."
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  warning: false
+  message: false
+---
+
+## Introduction
+
+This vignette shows how to use two dplyr functions that apply the same change to many columns at once:
+
+- **`rename_with()`** renames columns using a function or a vector of new names.
+- **`across()`** applies the same calculation to a group of columns inside `summarize()` or `mutate()`.
+
+Without these functions, you would need to write the same line of code once for every column. With them, one line handles all of them.
+
+The example uses FiveThirtyEight's **Bad Drivers** dataset. It has one row per state with fatal crash statistics, average car insurance premiums, and insurance company losses per insured driver. Since I work in insurance, I was curious whether states with worse drivers actually pay more for car insurance.
+
+**Data source:** FiveThirtyEight, "Dear Mona, Which State Has The Worst Drivers?" (2014). Data: <https://github.com/fivethirtyeight/data/tree/master/bad-drivers>
+
+## Loading the Data
+
+```{r}
+library(tidyverse)
+library(knitr)
+
+url <- "https://raw.githubusercontent.com/fivethirtyeight/data/master/bad-drivers/bad-drivers.csv"
+raw <- read_csv(url, show_col_types = FALSE)
+
+names(raw)
+```
+
+The column names are full sentences with spaces and symbols like `($)`. They are hard to type and would need backticks every time.
+
+## Renaming Many Columns with `rename_with()`
+
+`rename_with()` takes a function and applies it to the column names. Here the function returns a vector of short names, one for each column, in order.
+
+```{r}
+drivers <- raw %>%
+  rename_with(~ c(
+    "state",
+    "fatal_per_billion_miles",
+    "pct_speeding",
+    "pct_alcohol",
+    "pct_not_distracted",
+    "pct_no_prior_accidents",
+    "premium",
+    "losses"
+  ))
+
+glimpse(drivers)
+```
+
+I started every percentage column with `pct_`. That naming choice pays off in the next steps, because `across()` can select those columns by their prefix.
+
+`rename_with()` can also take a regular function. For example, `rename_with(str_to_lower)` would make every column name lowercase. You can limit it to certain columns with a second argument, such as `rename_with(str_to_upper, starts_with("pct_"))`.
+
+## Summarizing Many Columns with `across()`
+
+### One function on many columns
+
+`across()` has two main arguments: which columns to use, and what to do to them. `where(is.numeric)` selects every numeric column. The `~ round(mean(.x), 1)` part is the calculation, where `.x` stands for each column in turn.
+
+```{r}
+drivers %>%
+  summarize(across(where(is.numeric), ~ round(mean(.x), 1))) %>%
+  kable()
+```
+
+This one line replaces seven separate `mean()` calls. The average state has 15.8 drivers in fatal crashes per billion miles. The average premium is about $887.
+
+### Several functions on many columns
+
+You can pass a named list of functions to get more than one result per column. `across()` names the new columns automatically by joining the column name and the function name.
+
+```{r}
+drivers %>%
+  summarize(across(starts_with("pct_"), list(min = min, max = max))) %>%
+  pivot_longer(everything(), names_to = "measure", values_to = "value") %>%
+  kable()
+```
+
+I added `pivot_longer()` so the eight results print as rows instead of one very wide row. One value stands out. The lowest share of drivers who were "not distracted" is 10% (Mississippi), while most states are in the 80s and 90s. That could be a difference in how the state records distraction. It is worth checking before relying on that column.
+
+## Changing Many Columns with `across()` Inside `mutate()`
+
+`across()` also works inside `mutate()`. Here it turns every percentage into a proportion by dividing by 100. I also add a rough collision loss ratio, which is the losses per insured driver divided by the premium.
+
+```{r}
+drivers <- drivers %>%
+  mutate(
+    across(starts_with("pct_"), ~ .x / 100),
+    loss_ratio = round(losses / premium, 3)
+  )
+
+drivers %>%
+  slice_max(loss_ratio, n = 5) %>%
+  select(state, premium, losses, loss_ratio) %>%
+  kable(caption = "Highest collision loss ratios")
+
+drivers %>%
+  slice_min(loss_ratio, n = 5) %>%
+  select(state, premium, losses, loss_ratio) %>%
+  kable(caption = "Lowest collision loss ratios")
+```
+
+This is only a rough measure. The losses column covers collision claims only, while the premium covers the whole policy. Still, it shows a pattern. New York, New Jersey and DC have some of the highest premiums but some of the lowest collision loss ratios.
+
+## Putting It Together: What Drives Premiums?
+
+`across()` can also run a calculation that uses a second column. Here it finds the correlation between each driver measure and the premium.
+
+```{r}
+drivers %>%
+  summarize(across(
+    c(fatal_per_billion_miles, starts_with("pct_"), losses),
+    ~ cor(.x, premium)
+  )) %>%
+  pivot_longer(everything(), names_to = "measure", values_to = "correlation_with_premium") %>%
+  mutate(correlation_with_premium = round(correlation_with_premium, 2)) %>%
+  arrange(desc(correlation_with_premium)) %>%
+  kable()
+```
+
+```{r}
+ggplot(drivers, aes(x = losses, y = premium)) +
+  geom_point(color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "gray40") +
+  labs(
+    title = "Insurance Losses vs. Premiums by State",
+    x = "Collision losses per insured driver ($)",
+    y = "Average car insurance premium ($)"
+  ) +
+  theme_minimal()
+```
+
+Premiums track insurance losses (correlation 0.62), but they have almost no relationship with the driver behavior measures. The fatal crash rate is even slightly negative. In other words, states with "worse" drivers by these measures do not pay more. Premiums seem to follow what insurers pay out in claims, which also depends on things like repair costs, medical costs and how often people sue.
+
+## Summary
+
+| Function | What it does | Example from this vignette |
+|---|---|---|
+| `rename_with()` | Renames columns using a function | Shortened eight long column names in one step |
+| `across()` in `summarize()` | Same summary on many columns | Mean of every numeric column |
+| `across()` with a list | Several summaries on many columns | Min and max of every `pct_` column |
+| `across()` in `mutate()` | Same change to many columns | Converted every percentage to a proportion |
+
+
+#### AI Citation
+
+Anthropic. (2026). Claude Sonnet 5.5 [Large language model]. https://claude.ai. Accessed November 2026.
