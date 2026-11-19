@@ -1,0 +1,98 @@
+---
+title: "tidyVerse"
+author: "Mubin Ejaz"
+format: html
+editor: visual
+---
+
+## TidyVerse Assignment
+
+```{r}
+#Loading the package, tidyverse
+library(tidyverse)
+
+```
+
+## Introduction:
+
+I'd like to look at correlation between:
+
+1\) Different genders and their glucose levels\
+2) Different household income and glucose levels\
+3) People with glucose vs parents having diabetes or not.
+
+```{r}
+#Loading diabetes dataset from Kaggle.com
+DiabetesData <- read.csv(
+  "https://drive.usercontent.google.com/download?id=1KeT2EImIqQS6IUuRGZfePNNrDMB6F8jh&export=download&confirm=t"
+)
+
+```
+
+```{r}
+# Group the data by age group and gender
+DiabetesData %>% group_by(age_group, gender)%>%
+
+  # Calculate the average random glucose level for each group
+  summarise(
+    avg_glucose = mean(random_glucose_mg_dl)
+  )
+
+#loading graphing library to analyse and visualize the data 
+library(ggplot2)
+
+# Group the data by age group and gender, then calculate the
+# average random glucose level for each group.
+DiabetesData %>%
+  group_by(age_group, gender) %>%
+  
+ # Calculate the average glucose level and remove the grouping
+  # from the resulting data frame.
+  summarise(
+    avg_glucose = mean(random_glucose_mg_dl),
+    .groups = "drop"
+  ) %>%
+  
+  
+  # Create a bar chart with age group on the x-axis,
+  # average glucose on the y-axis, and gender represented by fill.
+  ggplot(aes(x = age_group, y = avg_glucose, fill = gender)) +
+  
+  
+  # Create side-by-side bars for each gender within each age group.
+  geom_col(position = "dodge")
+
+
+
+
+
+```
+
+```{r}
+# Create a new data frame called "db" by selecting the variables
+# needed for the analysis from the DiabetesData dataset.
+db <- DiabetesData %>% 
+  select(annual_income,
+         gender,
+         age_group,
+         weight_kg,
+         random_glucose_mg_dl)
+
+# Create a scatter plot to examine the relationship between
+# annual income and random glucose levels.
+ggplot(db, aes(x = annual_income, y = random_glucose_mg_dl)) +
+  
+   # Add individual data points to the plot.
+  # A low alpha value makes the points more transparent,
+  # which helps when many points overlap.
+  geom_point(alpha=0.1)+
+  
+ # Add a linear regression line to show the overall trend
+  # between annual income and random glucose level.
+  geom_smooth(method="lm")
+
+# There seems to be no / week correletion between annual income and diabetes / glucose levels 
+
+
+
+```
