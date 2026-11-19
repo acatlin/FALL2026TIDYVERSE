@@ -210,7 +210,7 @@ Initial Description and Link: This vignette demonstrates how to use the **Tidyve
 Revision/Addition Description and Link: _TBD_
 
 ### Muntasir M
-Initial Description and Link: _TBD_
+Initial Description and Link: Analyzing Vehicle Fuel Efficiency with Tidyverse. This vignette demonstrates how to use filter(), mutate(), group_by(), summarise(), arrange(), and ggplot2 to analyze and visualize vehicle fuel efficiency using the mpg dataset.
 
 Revision/Addition Description and Link: _TBD_
 
