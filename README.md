@@ -162,7 +162,7 @@ Initial Description and Link: basic tidyverse functions used to analyze gender a
 Revision/Addition Description and Link: _TBD_
 
 ### Kenny J
-Initial Description and Link: _TBD_
+Initial Description and Link: dplyr `across()` for working on many columns at once, using a food delivery orders dataset — [kenny_j_dplyr_across.qmd](vignettes/kenny_j_dplyr_across.qmd)
 
 Revision/Addition Description and Link: _TBD_
 
