@@ -1,0 +1,134 @@
+---
+title: "Tidyverse Assignment | 2019 NYC Subway Rider Survey"
+author: "Shanice Smith"
+date: "November 15, 2026"
+lang: en-US
+format:
+  html:
+    toc: true
+    theme: cosmo
+execute:
+  message: false
+---
+
+## Overview
+
+Collected by the City Council (NYCC) and Speaker Corey Johnson in 2019, the **2019 NYC Subway Rider Survey** data contains people's experiences with our mass transit system. The CSV contains 10,704 responses and was downloaded for this assignment from NYC Open Data in November 2026. This vignette uses the survey responses to demonstrate common data tasks of reading CSVs, unpacking answers from a single cell, and reformatting timestamps into date-times.
+
+### Functions used:
+
+| Function | Package | What it does in this vignette |
+|------------------------|------------------------|------------------------|
+| `read_csv()` | readr | Reads the survey CSV file into R |
+| `glimpse()` | dplyr | Shows every column, its type, and its first values |
+| `filter()` | dplyr | Keeps responses that answered the complaints question |
+| `mutate()` | dplyr | Creates new columns |
+| `str_remove_all()` | stringr | Removes the brackets and quotation marks around answers |
+| `separate_longer_delim()` | tidyr | Gives each complaint its own row |
+| `count()` | dplyr | Counts how often each value appears |
+| `parse_date_time()` | lubridate | Converts text timestamps into date-times |
+| `wday()`, `hour()` | lubridate | Extract the weekday and hour from a date-time |
+
+## Setup
+
+While the focus is tidyverse, we'll also use `knitr::kable()` to display results as accessible HTML tables.
+
+```{r}
+library(tidyverse)
+```
+
+## Loading the data
+
+`read_csv()` comes from **readr**, reading the CSV file into R as a table. The function automatically guesses the column type from its content, so we manually define the data type for zip codes (labels) and subway line (mix of letters and numbers) to a character type. readr also turns the text `NA` into real missing values and reads `true`/`false` as a logical column automatically. `glimpse` comes from **dplyr** so we can see every column in a data frame, displaying as much data as possible.
+
+```{r}
+url <- "https://raw.githubusercontent.com/shanicesmith98/data-607-assignments/refs/heads/main/data/Subway_Rider_Survey_(2019)_20261115.csv"
+
+subway_survey <- read_csv(
+  url,
+  col_types = cols(
+    zip_code = col_character(),
+    subway_line_used_most_often = col_character()
+  )
+)
+
+glimpse(subway_survey)
+```
+
+## Clean and count the complaints
+
+The `top_three_complaints` column stores several answers in one cell, formatted like a list: `['Delays', 'High fares', 'Overcrowded trains']`. Before we can count individual complaints, each one needs its own row. The pipeline below does this in four steps:
+
+1.  `filter()` drops respondents who skipped the question.
+2.  `str_remove_all()` deletes every bracket and quotation mark. The pattern `"\\[|\\]|'"` is a regular expression, a short code for describing text. The `|` means "or," and the brackets need `\\` in front because they have a special meaning in regular expressions.
+3.  `separate_longer_delim()` splits each cell wherever it finds `", "` (a comma followed by a space) and gives every complaint its own row.
+4.  `count()` tallies each complaint and sorts the results from most to least common.
+
+We then add a column showing what percentage of respondents listed each complaint. Also, despite the col name, some respondents only gave one or two complaints.
+
+
+```{r}
+complaint_respondents <- subway_survey |>
+  filter(!is.na(top_three_complaints)) |>
+  nrow()
+
+
+complaints <- subway_survey |>
+  filter(!is.na(top_three_complaints)) |>
+  mutate(complaint = str_remove_all(top_three_complaints, "\\[|\\]|'")) |>
+  separate_longer_delim(complaint, delim = ", ") |>
+  count(complaint, sort = TRUE) |>
+  mutate(pct_of_respondents = round(100 * n / complaint_respondents, 1))
+
+knitr::kable(
+  complaints,
+  col.names = c("Complaint", "Respondents who listed the complaint", "Percent of respondents"),
+  format.args = list(big.mark = ","),
+  caption = "Complaints listed by 2019 NYC Subway Rider Survey respondents"
+)
+
+```
+
+72% of respondents listed delays as a complaint of their subway rider experience, with 57% listing overcrowded trains, and nearly 38% naming frequent route changes.
+
+## Parsing custom timestamps
+
+The `submitted_at` column is stored as text like `01/07/2019 @ 07:21 AM`, so R can't sort it by time or pull out the hour. `parse_date_time()` from **lubridate** converts it into a real date-time.
+
+The `orders` argument describes the layout: month, day, year, then a 12-hour clock hour (`I`), minutes (`M`), and AM/PM (`p`). lubridate skips the `@` on its own. Setting `tz = "America/New_York"` records these as New York times; without it, lubridate labels them as UTC. Once the column is a real date-time, `wday()` extracts the day of the week and `hour()` extracts the hour on a 24-hour clock.
+
+```{r}
+subway_survey <- subway_survey |>
+  mutate(
+    submitted = parse_date_time(submitted_at, orders = "mdy IMp", tz = "America/New_York"),
+    weekday   = wday(submitted, label = TRUE, abbr = FALSE),
+    hour      = hour(submitted)
+  )
+
+range(subway_survey$submitted)
+
+knitr::kable(
+  count(subway_survey, weekday),
+  col.names = c("Day of the week", "Responses"),
+  format.args = list(big.mark = ","),
+  caption = "Survey responses by day of the week"
+)
+
+knitr::kable(
+  subway_survey |> count(hour, sort = TRUE) |> slice_head(n = 5),
+  col.names = c("Hour (24-hour clock)", "Responses"),
+  format.args = list(big.mark = ","),
+  caption = "The five hours with the most survey responses"
+)
+```
+
+The survey ran only from January 4 - 13, 2019. Most responses arrived on weekdays, and the busiest hour was 17:00 (5 PM), which fits commuters answering on their way home.
+
+## References
+
+- NYC Open Data, Subway Rider Survey 2019 <https://data.cityofnewyork.us/City-Government/Subway-Rider-Survey-2019-/4y8i-pbvd/about_data>
+- tidyverse package documentation: <https://www.tidyverse.org/packages/>
+
+## Credit
+
+*Anthropic*. (2026). Claude (Opus 5.5) \[Large language model\].
