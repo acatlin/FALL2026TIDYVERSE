@@ -121,9 +121,7 @@ Revision/Addition Description and Link: *TBD*
 ### Dillon L
 Initial Description and Link: Exploring N64 genres with filter(), count(), and arrange() — [dillon_l_n64_genres.qmd](vignettes/dillon_l_n64_genres.qmd)
 
-Initial Description and Link: *TBD*
-
-Revision/Addition Description and Link: *TBD*
+Revision/Addition Description and Link: Extended's Dillion's vignette with more `dplyr` functions to answer which N64 genres sold the most games with `group_by()`, `summarise()`, and `slice_max()` examples. [PR](/)
 
 ### Dylan D
 
