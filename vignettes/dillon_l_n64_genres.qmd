@@ -108,8 +108,79 @@ ggplot(genre_counts, aes(x = reorder(Genre, number_of_games), y = number_of_game
 
 ## Shanice S Addition
 
-### Introduction
+### Overview
 
-### Second Example
+Dillon's example counts how many N64 records each genre has. This addition asks which genres actually sold the most. It uses three more **dplyr** functions:
+
+#### Functions used
+
+| Function      | Package | What it does in this vignette                                    |
+|---------------|---------|------------------------------------------------------------------|
+| `group_by()`  | dplyr   | Splits the rows into one group per genre                         |
+| `summarise()` | dplyr   | Collapses each group into one row of summary values              |
+| `slice_max()` | dplyr   | Keeps the rows with the largest values in each group             |
+
+While the focus is tidyverse, we'll also use `knitr::kable()` to display results as accessible HTML tables.
+
+### Comparing Sales by Genre
+
+While `count()` provides a convenient way to count records, `group_by()` and `summarise()` allow us to calculate multiple statistics for each group.
+
+Here, `n()` counts the records in each genre, `sum()` calculates total global sales, and `median()` identifies the middle sales value for games within each genre.
+
+```{r}
+genre_sales <- n64_games %>%
+  group_by(Genre) %>%
+  summarise(
+    number_of_games = n(),
+    total_sales = sum(Global_Sales),
+    median_sales = median(Global_Sales)
+  ) %>%
+  arrange(desc(total_sales))
+
+knitr::kable(
+  genre_sales,
+  col.names = c(
+    "Genre",
+    "Number of game records",
+    "Total sales (millions)",
+    "Median sales per game (millions)"
+  ),
+  digits = 2,
+  caption = "Nintendo 64 genres ranked by total global sales"
+)
+```
+
+We learn that Sports has the most records but ranks third in total sales, while Racing generates the highest total sales. We can look at the medians to explain why: the typical game in every genre sold under half a million copies, so the differences in totals must come from a few very large hits.
+
+### Finding the Best-Selling Game in Each Genre
+
+To find those hits, we can use `slice_max()`, which selects the rows with the highest values within each group. `with_ties = FALSE` guarantees exactly one row per genre even if two games tie. `ungroup()` then removes the grouping so later steps treat the table as a whole; forgetting it is a common cause of surprising results.
+
+```{r}
+top_games <- n64_games %>%
+  group_by(Genre) %>%
+  slice_max(Global_Sales, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(Genre, Name, Global_Sales) %>%
+  arrange(desc(Global_Sales))
+
+knitr::kable(
+  top_games,
+  col.names = c(
+    "Genre",
+    "Best-selling game",
+    "Global sales (millions)"
+  ),
+  digits = 2,
+  caption = "Best-selling Nintendo 64 game in each genre"
+)
+```
+
+Super Mario 64 alone accounts for about a third of all Platform sales, which explains how a genre with relatively few games ranks second in total sales.
 
 ### Conclusion
+
+`count()` answers "how many?", while `group_by()` and `summarise()` can answer any per-group question, including "how much?" `slice_max()` then finds the top rows within each group. Together they show that the genre with the most N64 games is not the genre that sold the most: a handful of blockbusters drive the sales rankings. Without Mario Kart 64, for example, Racing would fall below Sports in total sales. Like the counts above, these sales figures are estimates from a historical dataset and do not cover the full N64 library.
+
+**AI assistance:** Anthropic Claude (Claude Opus 5.5), accessed November 22, 2026, assisted with selecting the example and drafting the code for this addition.
