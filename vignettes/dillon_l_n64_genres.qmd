@@ -105,3 +105,11 @@ ggplot(genre_counts, aes(x = reorder(Genre, number_of_games), y = number_of_game
 **Data source:** Smith, Gregory. *Video Games Sales* (2022), Zenodo. <https://doi.org/10.5281/zenodo.5898311>.
 
 **AI assistance:** OpenAI Codex (GPT-6), accessed November 14, 2026, assisted with drafting and reviewing this tutorial.
+
+## Shanice S Addition
+
+### Introduction
+
+### Second Example
+
+### Conclusion
