@@ -374,7 +374,7 @@ Through this extension, I demonstrated how `filter()`, `pivot_wider()`, `slice_m
 
 This analysis demonstrates the importance of considering multiple variables when comparing prices. The findings are descriptive rather than causal, and the dataset does not necessarily reflect current retail diamond prices. Differences in group sample sizes and other diamond characteristics should also be considered when interpreting the results.
 
-## Additional package and references
+## Additional package and references 
 
 This extension also requires the `tidyr` package.
 
