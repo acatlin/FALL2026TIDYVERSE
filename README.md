@@ -341,4 +341,4 @@ Revision/Addition Description and Link: *TBD*
 Revision/Addition Description and Link: Extended Zaina H's Netflix vignette with an example of separate_longer_delim() to separate multiple directors into individual rows — [PR #28](https://github.com/acatlin/FALL2026TIDYVERSE/pull/28)
 Initial Description and Link: Using a Netflix movies and TV shows dataset to demonstrate how TidyVerse functions can be used to clean and organize data, focused on separating genres into individual rows, counting the most common categories, and visualizing the results. [zaina_h_netflixgenres.qmd](vignettes/zaina_h_netflixgenres.qmd)
 
-Revision/Addition Description and Link: *TBD*
+Revision/Addition Description and Link: Extended Chanice Mckenzie's diamond prices vignette by exploring how cut, clarity, and color relate to the price of approximately one carat diamonds.
