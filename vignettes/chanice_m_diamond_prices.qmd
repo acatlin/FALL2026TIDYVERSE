@@ -148,3 +148,237 @@ This example demonstrates a common Tidyverse workflow: **create variables with `
 # Data source and reproducibility
 
 The dataset is `ggplot2::diamonds`, included in the [ggplot2 package](https://ggplot2.tidyverse.org/reference/diamonds.html). This vignette requires R and the packages `dplyr`, `ggplot2`, `knitr`, and `scales`. Install them if needed with `install.packages(c("dplyr", "ggplot2", "knitr", "scales"))`. To reproduce the analysis, open this `.qmd` in RStudio and select **Render**. No local data files are required.
+
+
+
+---
+
+# Extension: Exploring Diamond Quality and Price
+
+**Contributed by Zaina Hassan**
+
+## Introduction
+
+The original vignette explores how diamond prices vary by cut and carat size. However, other characteristics, such as clarity and color, can also influence price. As someone interested in understanding what makes one diamond more expensive than another, I wanted to extend this analysis by comparing diamonds of nearly identical sizes.
+
+This extension focuses on the following question: **How do cut, clarity, and color relate to diamond prices when comparing approximately one carat diamonds?**
+
+I will demonstrate additional Tidyverse functions, including `filter()`, `pivot_wider()`, and `slice_min()`, along with a heatmap using `geom_tile()`.
+
+## 1. Filter diamonds by carat weight
+
+The `filter()` function allows us to select observations that meet specific conditions. Since carat weight plays a major role in diamond pricing, I will narrow the dataset to diamonds between 1.00 and 1.09 carats to make the comparisons more consistent.
+
+```{r}
+library(tidyr)
+
+# Select approximately one-carat diamonds
+one_carat <- diamonds_clean |>
+  filter(carat >= 1.00, carat < 1.10)
+
+# Compare the number of observations
+tibble(
+  Dataset = c("Original dataset", "Filtered dataset"),
+  Observations = c(nrow(diamonds_clean), nrow(one_carat))
+) |>
+  kable(caption = "Number of diamonds before and after filtering")
+```
+
+Filtering the dataset reduces differences in diamond size, allowing us to focus more closely on other quality characteristics.
+
+## 2. Calculate price per carat
+
+Although the selected diamonds are similar in size, their weights are not identical. Using `mutate()`, we can calculate price per carat by dividing the total price by the diamond's carat weight.
+
+```{r}
+one_carat <- one_carat |>
+  mutate(price_per_carat = price / carat)
+
+# Preview the new variable
+one_carat |>
+  select(carat, cut, color, clarity, price, price_per_carat) |>
+  head(10) |>
+  kable(digits = 2, caption = "Diamond prices and price per carat")
+```
+
+Price per carat provides a standardized measure for comparing diamonds of slightly different weights.
+
+## 3. Compare prices across diamond cuts
+
+Building upon the original vignette, I will calculate the median price per carat for each cut using the filtered dataset.
+
+```{r}
+one_carat_summary <- one_carat |>
+  group_by(cut) |>
+  summarise(
+    diamonds = n(),
+    median_price_per_carat = median(price_per_carat),
+    .groups = "drop"
+  ) |>
+  arrange(desc(median_price_per_carat))
+
+one_carat_summary |>
+  kable(digits = 2, caption = "Median price per carat by cut")
+```
+
+```{r}
+ggplot(one_carat_summary,
+       aes(x = cut, y = median_price_per_carat, fill = cut)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = c(
+    "Fair" = "#EED5E3",
+    "Good" = "#DDA9C5",
+    "Very Good" = "#C47DAA",
+    "Premium" = "#A65B91",
+    "Ideal" = "#783D78"
+  )) +
+  scale_y_continuous(labels = scales::label_dollar()) +
+  labs(
+    title = "How Does Diamond Cut Relate to Price?",
+    subtitle = "Diamonds between 1.00 and 1.09 carats",
+    x = "Diamond cut",
+    y = "Median price per carat",
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+**Interpretation:** Among diamonds between 1.00 and 1.09 carats, Ideal cut diamonds have the highest median price per carat at approximately \$5,300, while Fair cut diamonds have the lowest at approximately $4,050. Interestingly, Very Good diamonds have a slightly higher median price per carat than Premium diamonds. This suggests that better cut quality is generally associated with higher prices, but cut alone does not explain all pricing differences. Other characteristics, such as clarity and color, may contribute to this pattern.
+
+## 4. Reshape diamond prices with `pivot_wider()`
+
+The `pivot_wider()` function from tidyr transforms data from long format into wide format. This is particularly useful when we want to compare multiple categories side by side.
+
+To make our comparison more consistent, I will focus on diamonds with color grade G and calculate the median price per carat for each combination of cut and clarity.
+
+```{r}
+# Keep diamonds within the same color grade
+diamond_quality <- one_carat |>
+  filter(color == "G") |>
+  group_by(cut, clarity) |>
+  summarise(
+    diamonds = n(),
+    median_price_per_carat = median(price_per_carat),
+    .groups = "drop"
+  )
+
+# Convert clarity categories into individual columns
+diamond_wide <- diamond_quality |>
+  select(cut, clarity, median_price_per_carat) |>
+  pivot_wider(
+    names_from = clarity,
+    values_from = median_price_per_carat,
+    names_sort = TRUE
+  )
+
+diamond_wide |>
+  kable(digits = 0,
+        caption = "Median price per carat by cut and clarity for G-color diamonds")
+```
+
+**Interpretation:** Reshaping the data into wide format makes it easier to compare diamond prices across clarity grades. Among G color diamonds with VS2 clarity, the median price per carat ranges from \$5,242 for Fair-cut diamonds to $6,275 for Ideal cut diamonds. Missing values indicate that certain combinations of cut and clarity are not represented in the filtered dataset. This demonstrates how `pivot_wider()` can make multidimensional comparisons more accessible.
+
+## 5. Visualize diamond quality using a heatmap
+
+A heatmap is useful for displaying relationships between two categorical variables and a numerical value. The `geom_tile()` function creates individual tiles, while the fill color represents the median price per carat.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 5.5
+
+ggplot(diamond_quality,
+       aes(x = clarity, y = cut, fill = median_price_per_carat)) +
+  geom_tile(color = "white", linewidth = 0.8) +
+  geom_text(
+    aes(label = scales::dollar(median_price_per_carat,
+                               accuracy = 1)),
+    size = 3
+  ) +
+  scale_fill_gradient(
+    low = "#FCE4EC",
+    high = "#B56BA5",
+    labels = scales::label_dollar()
+  ) +
+  labs(
+    title = "Diamond Prices Across Cut and Clarity",
+    subtitle = "G-color diamonds between 1.00 and 1.09 carats",
+    x = "Clarity grade",
+    y = "Cut quality",
+    fill = "Median price\nper carat",
+    caption = "Blank cells indicate unavailable combinations."
+  ) +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+**Interpretation:** The heatmap reveals a generally positive relationship between clarity and price per carat. For Ideal cut diamonds, the median price per carat increases from \$3,316 for I1 clarity to $8,691 for IF clarity, an increase of approximately 162%. This pattern suggests that clarity is an important characteristic associated with diamond pricing, even when color and carat weight are relatively consistent.
+
+However, the relationship is not perfectly consistent across all cut categories. For example, Fair cut diamonds with VVS2 clarity have a lower median price per carat than those with VS1 clarity. Differences in sample sizes or other diamond characteristics may contribute to these exceptions.
+
+## 6. Identify lower-priced diamonds using `slice_min()`
+
+The `slice_min()` function selects observations with the smallest values of a specified variable. In this example, I will use it to identify the diamond with the lowest price per carat within each cut category.
+
+To make the comparison more consistent, I will only consider diamonds with G color and VS2 clarity.
+
+```{r}
+affordable_diamonds <- one_carat |>
+  filter(color == "G", clarity == "VS2") |>
+  group_by(cut) |>
+  slice_min(
+    order_by = price_per_carat,
+    n = 1,
+    with_ties = FALSE
+  ) |>
+  ungroup() |>
+  select(cut, carat, color, clarity, price, price_per_carat) |>
+  arrange(price_per_carat)
+
+affordable_diamonds |>
+  kable(digits = 2,
+        caption = "Lowest price per carat within each available cut category")
+```
+
+**Interpretation:** Among diamonds with G color and VS2 clarity, the Fair cut diamond has the lowest price per carat at \$4,031.68. However, the Premium cut diamond stands out as an interesting alternative, costing \$4,677.06 per carat compared to $5,147.22 for the lowest priced Ideal cut diamond.
+
+The selected Premium diamond is also slightly larger at 1.09 carats compared to the Ideal diamond at 1.08 carats, while costing $461 less in total. This demonstrates how `slice_min()` can help identify potentially attractive options based on specific purchasing preferences. However, affordability should not be confused with overall quality, as other diamond characteristics may influence value.
+
+## 7. Validate the extension
+
+Similar to the original vignette, I will perform a few checks to ensure that the transformations were completed correctly.
+
+```{r}
+# Confirm that all diamonds meet the selected carat range
+stopifnot(all(one_carat$carat >= 1.00))
+stopifnot(all(one_carat$carat < 1.10))
+
+# Confirm that calculated prices are valid
+stopifnot(all(is.finite(one_carat$price_per_carat)))
+stopifnot(all(one_carat$price_per_carat > 0))
+
+# Confirm that selected diamonds meet the quality criteria
+stopifnot(nrow(affordable_diamonds) > 0)
+stopifnot(all(affordable_diamonds$color == "G"))
+stopifnot(all(affordable_diamonds$clarity == "VS2"))
+
+cat("All extension checks passed.")
+```
+
+## Extension Conclusion
+
+This extension builds upon Chanice's original diamond price analysis by examining diamonds with more comparable characteristics. By narrowing the carat range, calculating price per carat, and considering clarity and color, I was able to explore pricing differences beyond cut quality alone.
+
+The results showed that Ideal cut diamonds generally have higher median prices per carat and that higher clarity grades are typically associated with higher prices. However, the relationship between quality and price is not always straightforward. For example, a Premium cut diamond with G color and VS2 clarity was slightly larger and $461 less expensive than the selected Ideal cut diamond with the same color and clarity.
+
+Through this extension, I demonstrated how `filter()`, `pivot_wider()`, `slice_min()`, and `geom_tile()` can be used to transform, compare, and visualize data. What I found particularly interesting was how these functions could be applied to a real-world purchasing decision rather than simply producing summary statistics.
+
+This analysis demonstrates the importance of considering multiple variables when comparing prices. The findings are descriptive rather than causal, and the dataset does not necessarily reflect current retail diamond prices. Differences in group sample sizes and other diamond characteristics should also be considered when interpreting the results.
+
+## Additional package and references
+
+This extension also requires the `tidyr` package.
+
+- [tidyr: pivot_wider()](https://tidyr.tidyverse.org/reference/pivot_wider.html)
+- [dplyr: filter()](https://dplyr.tidyverse.org/reference/filter.html)
+- [dplyr: slice_min()](https://dplyr.tidyverse.org/reference/slice.html)
+- [ggplot2: geom_tile()](https://ggplot2.tidyverse.org/reference/geom_tile.html)
