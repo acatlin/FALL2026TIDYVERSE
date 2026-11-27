@@ -88,3 +88,30 @@ This example demonstrated how `dplyr` can be used to clean, summarize, and analy
 Vermont had the highest historical average yield at 0.298 gallons per tap, while Minnesota, despite having only six reported years ranked fourth. Looking at Minnesota's individual observations, showed their increase in yield over the years, ramping up production fast enough to match the averages of long established producers.
 
 Overall, this example shows how `dplyr` functions can help produce statistical summaries and support exploration of patterns in agricultural production.
+
+## Extended - Ellie Wilser
+
+I've extended this assignment by adding a map visualization to go along with the analysis above.
+
+```{r}
+library(maps)
+us_states <- map_data("state")
+map_df <- us_states %>%
+  left_join(
+    state_averages %>% mutate(region = str_to_lower(State)),
+    by = "region"
+  )
+```
+
+```{r}
+ggplot(map_df, aes(x = long, y = lat, group = group, fill = avg_yield)) +
+  geom_polygon(color = "white", linewidth = 0.2) +
+  coord_map("albers", lat0 = 39, lat1 = 45,
+            xlim = c(-97.5, -66.5), ylim = c(36.5, 48.5)) +
+  scale_fill_distiller(palette = "YlOrBr", direction = 1,
+                       na.value = "grey90", name = "Avg yield\n(gal/tap)") +
+  labs(title = "Average maple syrup yield per tap by state",
+       subtitle = "USDA NASS survey data; grey = no data",
+       x = NULL, y = NULL) +
+  theme_void()
+```
