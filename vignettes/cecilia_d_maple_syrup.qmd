@@ -91,7 +91,7 @@ Overall, this example shows how `dplyr` functions can help produce statistical s
 
 ## Extended - Ellie Wilser
 
-I've extended this assignment by adding a map visualizations to go along with the analysis above.
+I've extended this assignment by adding a map visualization to go along with the analysis above.
 
 ```{r}
 library(maps)
