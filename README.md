@@ -141,7 +141,7 @@ Revision/Addition Description and Link: *TBD*
 
 Initial Description and Link: Exploring Electricity Mix Data with Tidyverse [ellie_w_tidyr_energy_mix.qmd](vignettes/ellie_w_tidyr_energy_mix.qmd)
 
-Revision/Addition Description and Link:
+Revision/Addition Description and Link: https://github.com/acatlin/FALL2026TIDYVERSE/pull/32
 
 ### Enrique D
 
